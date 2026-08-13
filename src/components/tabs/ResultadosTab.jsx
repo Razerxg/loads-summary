@@ -89,15 +89,20 @@ function TablaCombos({ titulo, filas, env, pref }) {
 }
 
 function BloqueNivel({ r, abierto }) {
-  const { proyecto, nudoAct, modo } = useProyecto();
+  const { proyecto, nudoAct, modo, conjunto, incluidos } = useProyecto();
   const toast = useToast();
   const esRef = !!r.nivel.fijo;
+  // De QUÉ es esta tabla. Va al nombre del archivo y al encabezado del CSV: un CSV que
+  // dice «N1» cuando en realidad es la suma de veinte nudos es peor que uno sin rótulo.
+  const deQuien = conjunto
+    ? `Conjunto (${incluidos.map(n => n.nombre || "?").join("+")})`
+    : (nudoAct?.nombre || "");
 
   const exportar = () => {
-    const nom = `${(proyecto || "reacciones").replace(/\s+/g, "_")}_${(nudoAct?.nombre || "nudo")}`
+    const nom = `${(proyecto || "reacciones").replace(/\s+/g, "_")}_${conjunto ? "conjunto" : (nudoAct?.nombre || "nudo")}`
       + `_${esRef ? "nudo" : `h${f2(r.nivel.h).replace(".", "-")}`}.csv`;
     descargar(nom, csvDeNivel({
-      proyecto, nudo: nudoAct?.nombre || "", nivel: r.nivel, modo: MODOS[modo].label,
+      proyecto, nudo: deQuien, nivel: r.nivel, modo: MODOS[modo].label,
       comps: COMPONENTES, hipotesis: r.hipotesis, elu: r.elu, els: r.els,
       envELU: r.envELU, envELS: r.envELS,
     }));
@@ -149,8 +154,8 @@ function BloqueNivel({ r, abierto }) {
 }
 
 export function ResultadosTab() {
-  const { porNivel, modo, hips, nudoAct, irA } = useProyecto();
-  const conCargas = Object.keys(nudoAct?.cargas || {}).length;
+  const { porNivel, modo, hips, nudoAct, conjunto, incluidos, cargasBase, irA } = useProyecto();
+  const conCargas = Object.keys(cargasBase || {}).length;
   const faltantes = [...new Set(porNivel.flatMap(r => r.faltantes))];
   const vacias = [...new Set(porNivel.flatMap(r => r.vacias))];
 
@@ -160,7 +165,8 @@ export function ResultadosTab() {
     {!conCargas && (
       <Card tono="aviso">
         <div style={{ ...t.body, color: c.txt }}>
-          Este nudo no tiene ninguna carga cargada, así que todas las combinaciones dan cero.
+          {conjunto ? "El conjunto no tiene ninguna carga: revisá que haya nudos tildados y que traigan datos."
+            : "Este nudo no tiene ninguna carga cargada, así que todas las combinaciones dan cero."}{" "}
           Traé la planilla en <b>Importar</b> o cargá los valores a mano en <b>Hipótesis</b>.
         </div>
       </Card>

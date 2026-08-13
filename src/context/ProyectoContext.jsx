@@ -9,6 +9,7 @@ import { HIPS_DEF, agregarHips, quitarHip } from '../constants/hipotesis.js';
 import { DEF_ELU, DEF_ELS, mkCombo } from '../constants/combosDef.js';
 import { COMP_KEYS } from '../constants/componentes.js';
 import { calcular } from '../engine/combinar.js';
+import { sumarNudos } from '../engine/conjunto.js';
 import { MODO_DEF, mkNivel, nivelesOrdenados } from '../engine/traslado.js';
 import { TABS } from '../constants/tabs.js';
 
@@ -34,6 +35,11 @@ const inicial = () => ({
   hips: [...HIPS_DEF],
   nudos: [mkNudo("N1")],
   nudoAct: 0,
+  // MODO CONJUNTO: los nudos incluidos apoyan sobre UNA MISMA fundación y sus cargas se
+  // suman. Arranca apagado porque el otro caso —un nudo, una base— es el que no necesita
+  // ninguna decisión previa, y encender la suma sin querer cambiaría todos los números de
+  // golpe sin que nada lo delate.
+  conjunto: false,
   combosU: DEF_ELU.map(f => mkCombo({ ...f })),
   combosS: DEF_ELS.map(f => mkCombo({ ...f })),
   niveles: [],
@@ -127,22 +133,41 @@ export function ProyectoProvider({ children }) {
   // por vez porque la pantalla de resultados los muestra uno debajo del otro y compararlos
   // es justamente para lo que existe la app.
   const niveles = useMemo(() => nivelesOrdenados(st.niveles), [st.niveles]);
+  // ── DE DÓNDE SALEN LAS CARGAS ──
+  //
+  // Un nudo, o la suma de los incluidos en el conjunto. La decisión se toma UNA vez acá y
+  // todo lo de abajo —tablas, envolventes, memoria, CSV— consume el mismo objeto: si cada
+  // pantalla resolviera por su cuenta de dónde sacar las cargas, alcanzaría con que una se
+  // olvidara del modo conjunto para que mostrara un nudo suelto con el rótulo del conjunto.
+  const incluidos = useMemo(() => st.nudos.filter(n => n.incluido !== false), [st.nudos]);
+  const suma = useMemo(() => (st.conjunto ? sumarNudos(incluidos) : null), [st.conjunto, incluidos]);
+  const cargasBase = st.conjunto ? (suma?.cargas || {}) : (nudoAct?.cargas || {});
+
+  // En modo conjunto, una hipótesis que sólo trajo alguno de los nudos existe igual en el
+  // total: se agrega a la lista viva para que tenga columna en la matriz y fila en las
+  // tablas. Sin esto, una hipótesis presente en un solo nudo sumaría en silencio.
+  const hipsEfectivas = useMemo(() => {
+    if (!st.conjunto) return st.hips;
+    const extra = (suma?.hips || []).filter(h => !st.hips.includes(h));
+    return extra.length ? [...st.hips, ...extra] : st.hips;
+  }, [st.conjunto, st.hips, suma]);
+
   const porNivel = useMemo(() => niveles.map(nv => ({
     nivel: nv,
     ...calcular({
-      cargas: nudoAct?.cargas || {}, hips: st.hips,
+      cargas: cargasBase, hips: hipsEfectivas,
       combosU: st.combosU, combosS: st.combosS, h: nv.h, modo: st.modo,
       // El peso propio de la fundación es del NIVEL: cada cota acumula lo que haya entre
       // ella y el nudo. El de referencia lo lleva en cero por definición.
       ds: nv.fijo ? 0 : nv.ds,
     }),
-  })), [niveles, nudoAct, st.hips, st.combosU, st.combosS, st.modo]);
+  })), [niveles, cargasBase, hipsEfectivas, st.combosU, st.combosS, st.modo]);
 
   // ── ARCHIVO ──
   const exportar = useCallback(() => ({
     tipo: ARCHIVO_TIPO, version: 1, generado: new Date().toISOString(),
-    proyecto: st.proyecto, hips: st.hips, modo: st.modo,
-    nudos: st.nudos.map(n => ({ nombre: n.nombre, cargas: n.cargas })),
+    proyecto: st.proyecto, hips: st.hips, modo: st.modo, conjunto: st.conjunto,
+    nudos: st.nudos.map(n => ({ nombre: n.nombre, cargas: n.cargas, incluido: n.incluido !== false })),
     niveles: st.niveles.map(n => ({ nombre: n.nombre, h: n.h, ds: n.ds })),
     // Sin las claves `k` de sesión: son `Math.random()` y no significan nada fuera de ella.
     combos: { ELU: st.combosU.map(c => c.f), ELS: st.combosS.map(c => c.f) },
@@ -159,13 +184,15 @@ export function ProyectoProvider({ children }) {
       proyecto: typeof d.proyecto === "string" ? d.proyecto : "",
       hips: Array.isArray(d.hips) && d.hips.length ? d.hips : base.hips,
       nudos: Array.isArray(d.nudos) && d.nudos.length
-        ? d.nudos.map(n => mkNudo(n.nombre || "N", n.cargas || {})) : base.nudos,
+        ? d.nudos.map(n => ({ ...mkNudo(n.nombre || "N", n.cargas || {}), incluido: n.incluido !== false }))
+        : base.nudos,
       nudoAct: 0,
       combosU: Array.isArray(d.combos?.ELU) ? d.combos.ELU.map(f => mkCombo({ ...f })) : base.combosU,
       combosS: Array.isArray(d.combos?.ELS) ? d.combos.ELS.map(f => mkCombo({ ...f })) : base.combosS,
       niveles: Array.isArray(d.niveles)
         ? d.niveles.map(n => mkNivel(n.nombre || "Nivel", Number(n.h) || 0, Number(n.ds) || 0)) : [],
       modo: d.modo === "envolvente" ? "envolvente" : MODO_DEF,
+      conjunto: !!d.conjunto,
     });
     return { ok: true };
   }, []);
@@ -181,6 +208,13 @@ export function ProyectoProvider({ children }) {
     setCombosU: (fn) => set(s => ({ combosU: typeof fn === "function" ? fn(s.combosU) : fn })),
     setCombosS: (fn) => set(s => ({ combosS: typeof fn === "function" ? fn(s.combosS) : fn })),
     porNivel, exportar, importar, reiniciar,
+    // El modo conjunto y su resultado: `hips` sale sustituido por la lista EFECTIVA para
+    // que ninguna pantalla tenga que acordarse de agregarle las hipótesis del conjunto.
+    hips: hipsEfectivas, suma, incluidos, cargasBase,
+    setConjunto: (v) => set({ conjunto: v }),
+    setIncluido: (id, v) => set(s => ({
+      nudos: s.nudos.map(n => n.id === id ? { ...n, incluido: v } : n),
+    })),
     // Se navega POR NOMBRE y no por índice: insertar una pantalla en el medio renumeraba
     // todos los saltos y mandaba a cualquier lado sin que nada fallara.
     irA: (n) => setTab(typeof n === "number" ? n : Math.max(0, TABS.indexOf(n))),

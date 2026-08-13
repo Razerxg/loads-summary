@@ -103,12 +103,13 @@ function Tabla({ n, titulo, children }) {
 }
 
 export function ReporteTab() {
-  const { proyecto, nudoAct, nudos, hips, combosU, combosS, porNivel, modo, niveles } = useProyecto();
+  const { proyecto, nudoAct, nudos, hips, combosU, combosS, porNivel, modo, niveles,
+    conjunto, incluidos, suma, cargasBase } = useProyecto();
   const ref = useRef(null);
   const toast = useToast();
 
   const hoy = new Date().toLocaleDateString("es-AR");
-  const cargas = nudoAct?.cargas || {};
+  const cargas = cargasBase || {};
   const hipNudo = hips.filter(h => !esPorNivel(h));
   const usaDs = [...combosU, ...combosS].some(x => num(x.f?.[HIP_DS], 0) !== 0);
   const conDs = niveles.filter(nv => !nv.fijo && num(nv.ds, 0) !== 0);
@@ -164,7 +165,12 @@ export function ReporteTab() {
 
         <div style={R.h1}>MEMORIA DE CARGAS — {proyecto || "Reacciones y combinaciones"}</div>
         <div style={R.toc}>
-          <span style={R.tocL}><b>Nudo:</b> {nudoAct?.nombre || "—"} ({nudos.length} en el proyecto)</span>
+          <span style={R.tocL}>
+            <b>{conjunto ? "Apoyos:" : "Nudo:"}</b>{" "}
+            {conjunto
+              ? `${incluidos.length} apoyos sobre una misma fundación (${incluidos.map(n => n.nombre || "?").join(", ")})`
+              : `${nudoAct?.nombre || "—"} (${nudos.length} en el proyecto)`}
+          </span>
           <span style={R.tocL}><b>Fecha:</b> {hoy}</span>
           <span style={R.tocL}><b>Criterio de traslado:</b> {MODOS[modo].label}</span>
         </div>
@@ -252,22 +258,83 @@ export function ReporteTab() {
           </p>
         </>)}
 
-        <div style={R.h2}>3 · REACCIONES POR HIPÓTESIS EN EL NUDO</div>
-        <p style={R.p}>
-          Los valores de la Tabla N° {nT + 1} son los entregados por el modelo en el nudo
-          <b> {nudoAct?.nombre || "—"}</b>, sin mayorar y sin trasladar.
-        </p>
-        <Tabla n={gT()} titulo={`Reacciones por hipótesis en el nudo ${nudoAct?.nombre || ""}`}>
-          <Th cols={["Hipótesis", ...COLS_ESF]} />
-          <tbody>
-            {hipNudo.map(h => (
-              <tr key={h}>
-                <td style={R.tdL}>{h}{!cargas[h] && " (sin datos)"}</td>
-                {celdasEsf(cargas[h])}
-              </tr>
-            ))}
-          </tbody>
-        </Tabla>
+        <div style={R.h2}>3 · REACCIONES POR HIPÓTESIS</div>
+
+        {conjunto ? (<>
+          <div style={R.h3}>3.1 · Apoyos considerados y criterio de composición</div>
+          <p style={R.p}>
+            La fundación recibe simultáneamente las reacciones de <b>{incluidos.length} apoyos</b> del
+            modelo. Las acciones de cálculo se obtienen componiendo dichas reacciones
+            <b> hipótesis por hipótesis</b>, de modo que la resultante conserva el carácter de cada
+            acción y las combinaciones se aplican sobre el conjunto ya compuesto.
+          </p>
+          <p style={R.p}>
+            <b>Hipótesis de composición adoptada:</b> se considera que las resultantes de todos los
+            apoyos actúan en el <b>baricentro de la fundación</b>. En consecuencia, las acciones del
+            conjunto son la suma algebraica de las componentes homólogas:
+          </p>
+          <div style={R.frm}>
+            N = Σ Nᵢ     Vx = Σ Vxᵢ     Vy = Σ Vyᵢ{"\n"}
+            Myy = Σ Myyᵢ     Mxx = Σ Mxxᵢ     T = Σ Tᵢ
+          </div>
+          <p style={R.note}>
+            Bajo esta hipótesis no intervienen los momentos que generaría la excentricidad de cada
+            apoyo respecto del baricentro (términos N·e), por lo que no se requiere la posición en
+            planta de los nudos. El criterio es aplicable a conjuntos de apoyos razonablemente
+            simétricos respecto del baricentro de la fundación; para distribuciones de carga
+            vertical netamente descentradas, la verificación al vuelco debe efectuarse
+            considerando dichas excentricidades.
+          </p>
+          <Tabla n={gT()} titulo="Apoyos del modelo que gravitan sobre la fundación">
+            <Th cols={["Nudo", "Hipótesis aportadas"]} />
+            <tbody>
+              {incluidos.map(n => (
+                <tr key={n.id}>
+                  <td style={R.tdC}><b>{n.nombre || "(sin nombre)"}</b></td>
+                  <td style={R.tdL}>{Object.keys(n.cargas || {}).join(", ") || "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </Tabla>
+          {!!suma?.avisos?.length && (
+            <p style={R.note}>
+              <b>Observación:</b> {suma.avisos.join(" ")}
+            </p>
+          )}
+
+          <div style={R.h3}>3.2 · Acciones resultantes del conjunto</div>
+          <p style={R.p}>
+            Los valores de la Tabla N° {nT + 1} son la resultante de los {incluidos.length} apoyos,
+            sin mayorar y sin trasladar.
+          </p>
+          <Tabla n={gT()} titulo="Acciones por hipótesis resultantes del conjunto">
+            <Th cols={["Hipótesis", ...COLS_ESF]} />
+            <tbody>
+              {hipNudo.map(h => (
+                <tr key={h}>
+                  <td style={R.tdL}>{h}{!cargas[h] && " (sin datos)"}</td>
+                  {celdasEsf(cargas[h])}
+                </tr>
+              ))}
+            </tbody>
+          </Tabla>
+        </>) : (<>
+          <p style={R.p}>
+            Los valores de la Tabla N° {nT + 1} son los entregados por el modelo en el nudo
+            <b> {nudoAct?.nombre || "—"}</b>, sin mayorar y sin trasladar.
+          </p>
+          <Tabla n={gT()} titulo={`Reacciones por hipótesis en el nudo ${nudoAct?.nombre || ""}`}>
+            <Th cols={["Hipótesis", ...COLS_ESF]} />
+            <tbody>
+              {hipNudo.map(h => (
+                <tr key={h}>
+                  <td style={R.tdL}>{h}{!cargas[h] && " (sin datos)"}</td>
+                  {celdasEsf(cargas[h])}
+                </tr>
+              ))}
+            </tbody>
+          </Tabla>
+        </>)}
 
         <div style={R.h2}>4 · DEFINICIÓN DE LAS HIPÓTESIS DE CARGA</div>
         <Tabla n={gT()} titulo="Hipótesis de carga consideradas">
@@ -422,7 +489,9 @@ export function ReporteTab() {
 
         <div style={R.h2}>8 · CONCLUSIÓN</div>
         <p style={R.p}>
-          Se han determinado las solicitaciones de cálculo en el nudo <b>{nudoAct?.nombre || "—"}</b>{" "}
+          Se han determinado las solicitaciones de cálculo {conjunto
+            ? <>de la resultante de <b>{incluidos.length} apoyos</b> sobre una misma fundación</>
+            : <>en el nudo <b>{nudoAct?.nombre || "—"}</b></>}{" "}
           para {combosU.length} combinaciones últimas y {combosS.length} de servicio, y se las ha
           trasladado a {porNivel.length - 1 > 0
             ? `${porNivel.length - 1} cota${porNivel.length - 1 > 1 ? "s" : ""} por debajo del nudo`

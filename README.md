@@ -23,6 +23,32 @@ totales de cada combinación, en el nudo y a las profundidades que hagan falta.
 6. **Exporta a CSV**, un archivo por nivel, con separador `;` y coma decimal para que abra
    directo en Excel en español.
 
+## Los dos modos: un nudo, o el conjunto
+
+Son dos situaciones opuestas, y de cuál sea depende todo lo que muestra la app.
+
+**Un nudo, una fundación** — veinte soportes con veinte bases independientes. Cada nudo se
+mira por separado. Es el modo por defecto.
+
+**Varios nudos, una fundación** — un *sleeper*, una platea corrida, el skid en sus cuatro
+apoyos. Se tildan los nudos que gravitan sobre esa fundación y las cargas **se suman hipótesis
+por hipótesis**: las tablas pasan a ser de la **resultante del conjunto**, que es lo que hay que
+equilibrar para la estabilidad global.
+
+> Con la planilla de ejemplo (4 nudos): el `Vx` del peso propio se cancela entre apoyos
+> (0,553 − 0,561 + 0,269 − 0,261 ≈ 0), como corresponde a una estructura simétrica, y el del
+> viento `Wx+` se acumula a −15,54 kN — la fuerza horizontal total contra el deslizamiento.
+
+**Hipótesis de composición:** se considera que todas las resultantes actúan en el **baricentro
+de la fundación**, así que no hace falta la posición en planta de los nudos. La contrapartida es
+que el momento del conjunto es la suma de los momentos de los apoyos y **no incluye los términos
+`N·e`** de la excentricidad de cada uno: para un conjunto razonablemente simétrico es el
+criterio corriente, y para uno con las verticales netamente descentradas subestima el vuelco.
+
+Se suma **por hipótesis y no por combinación**: sumar combinaciones ya armadas mezclaría casos
+que no ocurren a la vez. Y si algún nudo no trae alguna hipótesis, la app lo avisa — tres de
+veinte sin `Wx+` dan un viento 15 % bajo que parece correcto.
+
 ## Ds — el peso propio de la fundación
 
 La planilla de CYPE **nunca lo trae**, y no es un defecto del importador: el modelo termina en

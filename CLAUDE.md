@@ -116,6 +116,35 @@ Portado de `bases-v-0.1`: el sistema de diseño entero (`tokens.js`, `styles.js`
   que faltaban conservaban los valores del ejemplo—, y eso no falla: da un resultado plausible
   y equivocado. Por el mismo motivo, «Reemplazar los nudos» viene tildado por defecto.
 
+- **HAY DOS MODOS Y SON OPUESTOS: «un nudo» y «conjunto».** No es una preferencia de
+  visualización, es de qué situación física se está hablando.
+  · **UN NUDO, UNA FUNDACIÓN** — veinte soportes con veinte bases independientes. Cada nudo se
+    mira por separado y sumarlos no significaría nada. Es el modo por defecto, porque es el
+    que no exige ninguna decisión previa.
+  · **VARIOS NUDOS, UNA FUNDACIÓN** (`conjunto: true`) — un sleeper, una platea corrida, el
+    skid en sus cuatro apoyos. Esa fundación recibe todas las reacciones a la vez y lo que hay
+    que equilibrar para la estabilidad global es la RESULTANTE.
+  · Los nudos incluidos se eligen con casillas: una planilla trae TODOS los del modelo y esta
+    fundación recibe unos pocos. Sumarlos todos por defecto metería apoyos de otra base.
+
+- **EL CONJUNTO SUMA COMPONENTE A COMPONENTE, SIN POSICIONES** (`engine/conjunto.js`). Eso
+  equivale a suponer que **todas las resultantes actúan en el baricentro de la fundación**, que
+  es el criterio adoptado y está declarado en el capítulo 3.1 de la memoria.
+  · **Consecuencia a no olvidar:** desaparecen los términos `N·e` de la excentricidad de cada
+    apoyo, y con ellos la necesidad de conocer la posición en planta de los nudos —que la tabla
+    de reacciones de CYPE no trae—. Para un conjunto razonablemente simétrico es el criterio
+    corriente; para uno con las verticales netamente descentradas, subestima el vuelco.
+  · **SE SUMA POR HIPÓTESIS, NO POR COMBINACIÓN.** Primero los veinte `Wx+`, después se
+    combina. Al revés mezclaría casos que no ocurren a la vez. Da lo mismo mientras la
+    combinación sea lineal, y hay un test que lo fija: si algún día apareciera un criterio no
+    lineal, ese test avisa que el orden deja de ser indistinto.
+  · **`Ds` sigue siendo uno solo**, del nivel: es el peso de la platea que recibe los apoyos,
+    no uno por nudo. Hay test.
+  · ⚠ **El aviso de hipótesis incompleta no es opcional.** Si tres de veinte nudos no traen
+    `Wx+`, el viento del conjunto sale un 15 % bajo; el número es plausible, no rompe nada, y
+    una suma de diecisiete valores no se revisa a ojo. Por eso `sumarNudos` devuelve `detalle`
+    con qué nudos aportaron a cada hipótesis y emite el aviso.
+
 - **`Ds` ES UNA PROPIEDAD DEL NIVEL, NO DEL NUDO.** El peso propio de la fundación no sale de
   la planilla y nunca va a salir: el modelo de CYPE termina en el nudo, que es la cara
   superior de la fundación. A 0,00 m no hay nada de fundación arriba y a 1,50 m hay todo lo

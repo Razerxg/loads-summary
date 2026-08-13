@@ -47,7 +47,7 @@ export function HipotesisTab() {
   };
 
   return (<>
-    <SelectorNudo conEditar />
+    <SelectorNudo conEditar soloNudo />
 
     <Card titulo="Esfuerzos por hipótesis"
       desc="Lo que entregó el modelo, sin combinar. Los campos son editables: lo que la planilla no haya traído se completa acá.">
