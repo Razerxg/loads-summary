@@ -1,0 +1,22 @@
+# El CI está DELIBERADAMENTE SEPARADO DEL DEPLOY: un test en rojo avisa, pero no impide
+# publicar. Es la única forma en que la suite se ejecuta —en la máquina del autor no hay
+# Node— así que tiene que correr en cada push y en cada PR.
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  vitest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
