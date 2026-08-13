@@ -16,8 +16,25 @@ totales de cada combinación, en el nudo y a las profundidades que hagan falta.
    con el nombre de la combinación que la produce.
 4. **Traslada a profundidad** — cada nivel declarado genera su propio juego de tablas con los
    momentos ya llevados a esa cota: `Myy′ = Myy + Vx·h`, `Mxx′ = Mxx + Vy·h`.
-5. **Exporta a CSV**, un archivo por nivel, con separador `;` y coma decimal para que abra
+5. **Emite la memoria** — pestaña *Reporte*: las mismas cifras con el formato de tabla de las
+   memorias de bases y soporte elevado (papel blanco, Arial, «Tabla N° x»). Cada tabla tiene
+   su botón de **copiar**, que la deja en el portapapeles con formato para pegarla directo en
+   un Word; y hay un `.doc` de la memoria entera.
+6. **Exporta a CSV**, un archivo por nivel, con separador `;` y coma decimal para que abra
    directo en Excel en español.
+
+## Ds — el peso propio de la fundación
+
+La planilla de CYPE **nunca lo trae**, y no es un defecto del importador: el modelo termina en
+el nudo, que es la cara superior de la fundación. La zapata, el pedestal y el suelo que gravita
+encima existen *por debajo* de ese punto.
+
+Por eso `Ds` se carga **por nivel** —a 0,00 m no hay nada de fundación arriba— y **entra en las
+combinaciones con su propio coeficiente**, minorado a 0,90 (ELU) y 0,60 (ELS) en las que
+gobiernan el levantamiento. No es una suma al final.
+
+Se supone resultante centrada, o sea que `Ds` **no genera momento**: es correcto para zapata
+simétrica bajo el pedestal y no lo es para una fundación excéntrica. No contempla subpresión.
 
 ## Qué NO hace
 

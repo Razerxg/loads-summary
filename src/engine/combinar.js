@@ -20,10 +20,36 @@
 // Combinar primero es lo correcto: la envolvente conservadora se aplica sobre la
 // SOLICITACIÓN REAL de la combinación, no sobre cada pedazo por separado.
 import { COMP_KEYS } from '../constants/componentes.js';
-import { esAccidental, comboDesc, comboDescNatural } from '../constants/hipotesis.js';
+import { esAccidental, comboDesc, comboDescNatural, HIP_DS } from '../constants/hipotesis.js';
 import { trasladar, MODO_DEF } from './traslado.js';
 
 const n0 = (v) => (typeof v === "number" && isFinite(v) ? v : 0);
+
+// ── EL PESO PROPIO DE LA FUNDACIÓN ──────────────────────────────────────────────
+//
+// `Ds` no viene de la planilla y nunca va a venir: el modelo de CYPE termina en el nudo, que
+// es la cara superior de la fundación. Aparece recién al bajar a la cota de desplante, y su
+// valor depende DEL NIVEL —a 0,00 m no hay nada de fundación arriba—, así que se inyecta
+// como una carga más del nivel y de ahí en adelante el pipeline no lo distingue del resto.
+//
+// ES UNA FUERZA VERTICAL PURA, sin cortes ni momentos:
+//  · el signo es POSITIVO porque `N` es positiva en compresión sobre el apoyo, y el peso de
+//    la fundación comprime;
+//  · **no genera momento**, lo que supone que su resultante pasa por el mismo punto en que
+//    se están midiendo los esfuerzos. Es lo correcto para una zapata simétrica bajo el
+//    pedestal, que es el caso normal. Una fundación excéntrica agregaría `N·e` y eso esta
+//    app no lo modela; está dicho en la pantalla de Niveles.
+//
+// Como no tiene corte, trasladarlo es una operación nula: `M + V·h` con `V = 0` deja el
+// momento igual. Por eso puede entrar antes del traslado sin ningún caso especial, y por eso
+// da lo mismo dónde se inyecte. Es lo que hace que no haga falta un camino aparte.
+export const cargaDs = (ds) => ({ ...Object.fromEntries(COMP_KEYS.map(k => [k, 0])), N: n0(ds) });
+
+// Las cargas del nudo más el `Ds` del nivel. Con `ds = 0` NO se agrega la clave: así el nivel
+// de referencia no arrastra una hipótesis en cero que después habría que explicar en cada
+// tabla, y `combinar` puede distinguir «no corresponde» de «vale cero».
+export const cargasEnNivel = (cargas, ds) =>
+  n0(ds) !== 0 ? { ...cargas, [HIP_DS]: cargaDs(ds) } : { ...cargas };
 
 // ── SUMA PONDERADA ──────────────────────────────────────────────────────────────
 //
@@ -122,15 +148,27 @@ export function tablaHipotesis({ cargas, hips, h = 0, modo = MODO_DEF }) {
 // Un solo punto de entrada para la pantalla de resultados: para un nudo y un nivel,
 // devuelve las tres tablas y la envolvente de cada set. Tenerlo acá y no en el componente
 // es lo que permite probarlo sin montar React.
-export function calcular({ cargas, hips, combosU, combosS, h = 0, modo = MODO_DEF }) {
-  const hipotesis = tablaHipotesis({ cargas, hips, h, modo });
-  const elu = tablaCombos({ cargas, combos: combosU, pref: "ELU", h, modo, hips });
-  const els = tablaCombos({ cargas, combos: combosS, pref: "ELS", h, modo, hips });
+export function calcular({ cargas, hips, combosU, combosS, h = 0, modo = MODO_DEF, ds = 0 }) {
+  const cargasN = cargasEnNivel(cargas, ds);
+  const hipotesis = tablaHipotesis({ cargas: cargasN, hips, h, modo });
+  const elu = tablaCombos({ cargas: cargasN, combos: combosU, pref: "ELU", h, modo, hips });
+  const els = tablaCombos({ cargas: cargasN, combos: combosS, pref: "ELS", h, modo, hips });
+
+  // `Ds` sale del aviso genérico de «hipótesis con factor pero sin cargas»: en el nivel de
+  // referencia vale cero POR DEFINICIÓN —no hay fundación arriba del nudo— y ahí el aviso
+  // sería ruido en todas las combinaciones. Lo que sí hay que decir es lo contrario: un
+  // nivel EN PROFUNDIDAD cuyas combinaciones usan `Ds` y que no tiene el peso cargado. Ése es
+  // un olvido real, y da un total menor y perfectamente plausible.
+  const usaDs = [...combosU, ...combosS].some(c => n0((c.f ?? c)?.[HIP_DS]) !== 0);
+  const faltantes = [...new Set([...elu, ...els].flatMap(f => f.faltan))].filter(k => k !== HIP_DS);
+
   return {
-    hipotesis, elu, els,
+    hipotesis, elu, els, ds: n0(ds),
     envELU: envolvente(elu), envELS: envolvente(els),
     // Los avisos se calculan UNA vez acá y no en cada tabla: son del cálculo entero.
-    faltantes: [...new Set([...elu, ...els].flatMap(f => f.faltan))],
+    faltantes,
     vacias: [...elu, ...els].filter(f => f.vacia).map(f => f.nombre),
+    sinDs: usaDs && n0(h) !== 0 && n0(ds) === 0,
+    usaDs,
   };
 }

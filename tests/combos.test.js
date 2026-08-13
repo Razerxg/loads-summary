@@ -33,6 +33,40 @@ describe("los sets de combinación", () => {
     }
   });
 
+  // ⚠ LA SEGUNDA INVARIANTE: `Ds` —el peso propio de la fundación— es una carga permanente
+  // más, así que lleva EL MISMO FACTOR que el resto de los permanentes de esa combinación:
+  // 1,4 donde va 1,4, y 0,9 en las de levantamiento, donde minorarlo es lo conservador.
+  //
+  // Hoy se deriva de `PP` con `conDs()`, así que este test no puede fallar por descuido al
+  // escribir una fila. Está igual porque el día que alguien vuelva a escribirlos sueltos
+  // —para dar a una combinación un `Ds` distinto— tiene que enterarse acá y no en una
+  // memoria emitida: un `Ds` con el factor equivocado da un total plausible.
+  it("TODA combinación con PP lleva Ds con el MISMO factor", () => {
+    for (const [nombre, set] of TODOS) {
+      set.forEach((f, i) => {
+        if (f.PP === undefined) return;
+        expect(f.Ds, `${nombre}[${i + 1}] tiene PP sin Ds: ${JSON.stringify(f)}`).toBeDefined();
+        expect(f.Ds, `${nombre}[${i + 1}]: Ds ${f.Ds} ≠ PP ${f.PP}`).toBe(f.PP);
+      });
+    }
+  });
+
+  // En las de levantamiento el peso propio de la fundación es ESTABILIZANTE: el factor tiene
+  // que quedar minorado, no en 1,0. Es el caso en que un Ds mal factorizado deja de ser
+  // conservador, y por eso se comprueba aparte.
+  it("las combinaciones de levantamiento minoran Ds junto con el resto de los permanentes", () => {
+    for (const [nombre, set] of TODOS) {
+      const lev = set.filter(f => f.PP !== undefined && f.PP < 1);
+      for (const f of lev) {
+        expect(f.Ds, `${nombre}: una combinación de levantamiento no minora Ds`).toBe(f.PP);
+        expect(f.Ds).toBeLessThan(1);
+      }
+    }
+    // y existe al menos una en cada set patrón, o el control no estaría probando nada
+    expect(DEF_ELU.some(f => f.PP === 0.9)).toBe(true);
+    expect(DEF_ELS.some(f => f.PP === 0.6)).toBe(true);
+  });
+
   it("ninguna combinación queda vacía", () => {
     for (const [nombre, set] of TODOS) {
       set.forEach((f, i) => {
@@ -114,9 +148,32 @@ describe("familias y descripciones", () => {
     expect(comboDesc({ "Wx+": 1, PP: 1.2, Do: 0 }, hips)).toBe("1,20·PP + 1,00·Wx+");
   });
 
-  it("la descripción en palabras no repite «viento» cuatro veces", () => {
+  // Con el rótulo LARGO, una combinación corriente se describía como «Peso propio de la
+  // fundación + Peso propio (del modelo) + Peso en operación + Sobrecarga de uso + Nieve +
+  // viento» y estiraba cada fila de la memoria a seis renglones.
+  it("la descripción en palabras usa el nombre corto", () => {
     expect(comboDescNatural({ PP: 1, Do: 1, "Wx+": 1 }, ["PP", "Do", "Wx+"]))
-      .toBe("Peso propio (del modelo) + Peso en operación + viento");
+      .toBe("peso propio + operación + viento");
+  });
+
+  it("los cuatro vientos colapsan en una sola palabra", () => {
+    const f = { Ds: 1, PP: 1, Do: 1, "Wx+": 1, "Wx-": 1, "Wy+": 1, "Wy-": 1 };
+    expect(comboDescNatural(f, Object.keys(f)))
+      .toBe("peso de fundación + peso propio + operación + viento");
+  });
+
+  it("una hipótesis fuera del catálogo entra con su propio nombre", () => {
+    expect(comboDescNatural({ "V(90°)H1": 1.5 }, ["V(90°)H1"])).toBe("V(90°)H1");
+  });
+
+  // Todo el catálogo tiene nombre corto: si a una entrada nueva se le olvidara, la columna
+  // «Acciones» de la memoria saldría con un hueco en vez de decir qué acción es.
+  it("ninguna entrada del catálogo se queda sin nombre corto", () => {
+    for (const h of HIP_CAT) {
+      expect(h.corto, `«${h.k}» no tiene nombre corto`).toBeTruthy();
+      expect(h.corto.length, `«${h.k}»: el corto no es más corto que el rótulo`)
+        .toBeLessThanOrEqual(h.rotulo.length);
+    }
   });
 });
 

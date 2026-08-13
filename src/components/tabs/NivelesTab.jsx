@@ -74,7 +74,8 @@ export function NivelesTab() {
       <table className="bx-tabla" style={s.table}>
         <thead><tr>
           <th style={{ ...s.th, textAlign: "left" }}>Nombre</th>
-          <th style={{ ...s.th, width: 130 }}>h <span style={{ ...t.micro, fontWeight: 400 }}>(m)</span></th>
+          <th style={{ ...s.th, width: 110 }}>h <span style={{ ...t.micro, fontWeight: 400 }}>(m)</span></th>
+          <th style={{ ...s.th, width: 120 }}>Ds <span style={{ ...t.micro, fontWeight: 400 }}>(kN)</span></th>
           <th style={{ ...s.th, textAlign: "left" }}>Brazo que agrega</th>
           <th style={{ ...s.th, width: 34 }}></th>
         </tr></thead>
@@ -85,22 +86,34 @@ export function NivelesTab() {
               <span style={{ marginLeft: 8 }}><Badge tono="info">fijo</Badge></span>
             </td>
             <td style={s.td}>0,00</td>
+            {/* El nudo NO lleva Ds y el campo ni siquiera se ofrece: por encima del nudo no
+                hay fundación. Dejarlo editable invitaría a cargar ahí el peso de la zapata,
+                que es justo el error de contar la fundación a una cota donde todavía no
+                existe. */}
+            <td style={{ ...s.td, color: c.txt3 }}>—</td>
             <td style={{ ...s.tdL, color: c.txt3 }}>— (es la referencia)</td>
             <td style={s.td}></td>
           </tr>
           {extra.map(nv => (
             <tr key={nv.id}>
               <td style={{ ...s.tdL, padding: "2px 6px" }}>
-                <input className="bx-in" style={{ ...s.inp, width: 200, fontFamily: "inherit" }}
+                <input className="bx-in" style={{ ...s.inp, width: 190, fontFamily: "inherit" }}
                   value={nv.nombre} aria-label="Nombre del nivel"
                   placeholder="p. ej. Fondo de zapata"
                   onChange={e => setNivel(nv.id, { nombre: e.target.value })} />
               </td>
               <td style={{ ...s.td, padding: "2px 3px" }}>
                 <input className="bx-in" type="number" step="any"
-                  style={{ ...s.inp, width: 90, textAlign: "right" }}
+                  style={{ ...s.inp, width: 84, textAlign: "right" }}
                   value={nv.h} aria-label="Profundidad en metros"
                   onChange={e => setNivel(nv.id, { h: e.target.value === "" ? 0 : Number(e.target.value) })} />
+              </td>
+              <td style={{ ...s.td, padding: "2px 3px" }}>
+                <input className="bx-in" type="number" step="any"
+                  style={{ ...s.inp, width: 94, textAlign: "right",
+                    borderColor: !Number(nv.ds) ? c.ambarBd : undefined }}
+                  value={nv.ds ?? 0} aria-label="Peso propio de la fundación en kN" placeholder="0"
+                  onChange={e => setNivel(nv.id, { ds: e.target.value === "" ? 0 : Number(e.target.value) })} />
               </td>
               <td style={{ ...s.tdL, fontFamily: MONO, color: c.txt2, whiteSpace: "nowrap" }}>
                 {Object.entries(PAR_TRASLADO)
@@ -123,6 +136,36 @@ export function NivelesTab() {
         <b>La profundidad es positiva hacia abajo</b> y se mide desde el nudo del modelo. Un
         valor negativo levanta el punto y hace decrecer los momentos: se acepta —a veces hace
         falta— pero revisá que sea lo que querías.
+      </div>
+    </Card>
+
+    <Card titulo="Ds — el peso propio de la fundación" tono="aviso">
+      <div style={{ ...t.body, color: c.txt }}>
+        <b>La planilla de CYPE nunca lo trae, y no es un defecto del importador:</b> el modelo
+        termina en el nudo, que es la cara superior de la fundación. La zapata, el pedestal y el
+        suelo que gravita encima existen <i>por debajo</i> de ese punto, así que aparecen recién
+        cuando las cargas se bajan a la cota de desplante.
+        <br /><br />
+        Por eso <code>Ds</code> es una propiedad <b>del nivel</b> y no del nudo: a 0,00 m no hay
+        nada de fundación arriba, y a {extra.length ? f2(Number(extra[0].h) || 0) : "1,50"} m hay
+        todo lo que haya entre las dos cotas. Cargalo en kN, <b>positivo</b>: en esta app
+        <code> N</code> es positiva en compresión, y el peso de la fundación comprime.
+        <div style={{ margin: `${SP.md}px 0`, padding: SP.md, background: c.surface,
+          border: `1px solid ${c.border}`, borderRadius: R.md, fontFamily: MONO,
+          ...t.num, lineHeight: 1.9, overflowX: "auto" }}>
+          Ds = γ_H° · Vol_hormigón &nbsp;+&nbsp; γ_suelo · Vol_suelo sobre la zapata
+        </div>
+        <b>Entra en las combinaciones con su propio factor.</b> No se suma al final: es una
+        carga permanente más, así que la matriz le aplica 1,4 donde va 1,4 y <b>0,9 en las de
+        levantamiento</b>, que es donde minorarla es lo conservador. Los sets de esta app ya
+        traen la columna <code>φDs</code> con el mismo factor que <code>φPP</code>.
+        <br /><br />
+        <b style={{ color: c.ambar }}>Dos límites que conviene tener presentes.</b> Se supone
+        que la resultante del peso pasa por el punto donde se miden los esfuerzos, o sea que
+        <b> no genera momento</b>: es lo correcto para una zapata simétrica bajo el pedestal, y
+        no lo es para una fundación excéntrica, que agregaría <code>N·e</code>. Y el empuje
+        <b> hacia arriba del agua</b> —subpresión, si hay napa por encima del plano de
+        fundación— tampoco está: si corresponde, descontalo del valor que cargues acá.
       </div>
     </Card>
 

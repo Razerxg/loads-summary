@@ -23,9 +23,27 @@
 // §2.3/§2.4; ACI 318-19, que las adopta; CIRSOC 201 en marco LRFD; PIP STC01015). Se cargan
 // como PUNTO DE PARTIDA EDITABLE: verificá los factores contra la edición vigente aplicable
 // al proyecto antes de emitir nada.
+//
+// ⚠ **`Ds` VIAJA PEGADO A `PP`, y no se escribe a mano en cada fila.**
+//
+// `Ds` es el peso propio de la FUNDACIÓN, que no sale del modelo —CYPE termina en el nudo—
+// y aparece recién al bajar las cargas a la cota de desplante. Es una carga permanente más,
+// así que lleva EL MISMO FACTOR que el resto de los pesos permanentes de esa combinación:
+// 1,4 donde va 1,4 y 0,9 en las de levantamiento, donde su carácter estabilizante hace que
+// minorarla sea lo conservador.
+//
+// Se deriva de `PP` con `conDs()` en vez de escribirlo en las ochenta filas de abajo. Con
+// dos números que tienen que ser iguales repetidos ochenta veces, la pregunta no es si
+// alguno va a quedar distinto sino cuándo; y un `Ds` con el factor equivocado da un total
+// plausible que nadie va a revisar. Hay un test que exige la igualdad igual, por si alguien
+// vuelve a escribirlos sueltos.
 import { VIENTOS, PSV } from './hipotesis.js';
 
 export const mkCombo = (f) => ({ k: Math.random().toString(36).slice(2), f });
+
+// `Ds` primero en el objeto, para que las columnas de la matriz salgan en el orden en que se
+// leen las cargas permanentes: fundación, peso propio del modelo, peso de estado.
+const conDs = (set) => set.map(f => (f.PP === undefined ? f : { Ds: f.PP, ...f }));
 
 // helpers: replican una combinación en las direcciones/sentidos de una acción
 const dir2 = (base, kx, ky, f) => [{ ...base, [kx]: f }, { ...base, [ky]: f }];
@@ -38,7 +56,7 @@ const dir4 = (base, f) => VIENTOS.map(w => ({ ...base, [w]: f }));
 const psv = (base, f = 1.0) => PSV.map(k => ({ ...base, [k]: f }));
 
 // ── SET PATRÓN ──────────────────────────────────────────────────────────────────
-export const DEF_ELU = [
+export const DEF_ELU = conDs([
   { PP: 1.4, De: 1.4 }, { PP: 1.4, Do: 1.4 }, { PP: 1.4, Dt: 1.4 },
   { PP: 1.2, De: 1.2, L: 1.6, S: 0.5 }, { PP: 1.2, Do: 1.2, L: 1.6, S: 0.5 },
   { PP: 1.2, Do: 1.2, S: 1.6, L: 1.0 },
@@ -51,9 +69,9 @@ export const DEF_ELU = [
   ...dir2({ PP: 0.9, De: 0.9 }, "Eex", "Eey", 1.0),
   { PP: 1.2, Do: 1.2, Ts: 1.2 },
   ...psv({ PP: 1.2, Do: 1.2, L: 1.0 }),
-];
+]);
 
-export const DEF_ELS = [
+export const DEF_ELS = conDs([
   { PP: 1, De: 1 }, { PP: 1, Do: 1 }, { PP: 1, Dt: 1 },
   { PP: 1, Do: 1, L: 1 }, { PP: 1, Do: 1, S: 1 },
   ...dir4({ PP: 1, Do: 1 }, 0.6),
@@ -63,12 +81,12 @@ export const DEF_ELS = [
   { PP: 1, Do: 1, Ts: 1 },
   { PP: 1, Dt: 1, "Wx+": 0.3 },
   ...psv({ PP: 1, Do: 1 }),
-];
+]);
 
 // ── SETS POR NORMATIVA ──────────────────────────────────────────────────────────
 
 // CIRSOC 201 §9.2 (LRFD): viento de servicio mayorado (1,6W / 0,8W), sismo 1,0E.
-const ELU_CIRSOC = [
+const ELU_CIRSOC = conDs([
   { PP: 1.4, De: 1.4 }, { PP: 1.4, Do: 1.4 }, { PP: 1.4, Dt: 1.4 },
   { PP: 1.2, Do: 1.2, L: 1.6, S: 0.5 },
   { PP: 1.2, Do: 1.2, S: 1.6, L: 1.0 },
@@ -79,10 +97,10 @@ const ELU_CIRSOC = [
   ...dir2({ PP: 0.9, De: 0.9 }, "Eex", "Eey", 1.0),
   { PP: 1.2, Do: 1.2, Ts: 1.2 },
   ...psv({ PP: 1.2, Do: 1.2, L: 1.0 }),
-];
+]);
 
 // ASCE 7-16 §2.3.1 — viento ya a nivel de resistencia (1,0W). ACI 318-19 §5.3 las adopta.
-const ELU_ASCE716 = [
+const ELU_ASCE716 = conDs([
   { PP: 1.4, De: 1.4 }, { PP: 1.4, Do: 1.4 }, { PP: 1.4, Dt: 1.4 },
   { PP: 1.2, Do: 1.2, L: 1.6, S: 0.5 },
   { PP: 1.2, Do: 1.2, S: 1.6, L: 1.0 },
@@ -93,11 +111,11 @@ const ELU_ASCE716 = [
   ...dir2({ PP: 0.9, De: 0.9 }, "Eex", "Eey", 1.0),
   { PP: 1.2, Do: 1.2, Ts: 1.2 },
   ...psv({ PP: 1.2, Do: 1.2, L: 1.0 }),
-];
+]);
 
 // PIP STC01015 (rev. abril 2017) — Tabla 5, Strength Design. Distingue operación, vacío y
 // prueba, con térmica sostenida al peso y casos de levantamiento a 0,9D.
-const ELU_PIP = [
+const ELU_PIP = conDs([
   { PP: 1.4, Do: 1.4 }, { PP: 1.4, Dt: 1.4 },
   { PP: 1.2, Do: 1.2, L: 1.6, S: 0.5 },
   { PP: 1.2, Do: 1.2, S: 1.6, L: 1.0 },
@@ -110,7 +128,7 @@ const ELU_PIP = [
   ...dir2({ PP: 0.9, De: 0.9 }, "Eex", "Eey", 1.0),
   { PP: 1.2, Do: 1.2, Ts: 1.2 },
   ...psv({ PP: 1.2, Do: 1.2, L: 1.0 }),
-];
+]);
 
 export const NORMATIVAS_ELU = {
   pp: { label: "Set patrón de la app", combos: DEF_ELU,
@@ -126,7 +144,7 @@ export const NORMATIVAS_ELU = {
 };
 
 // CIRSOC 201 (tensiones admisibles): viento de servicio 1,0W, sismo 0,7E, levantamiento 0,6D.
-const ELS_CIRSOC = [
+const ELS_CIRSOC = conDs([
   { PP: 1, De: 1 }, { PP: 1, Do: 1 }, { PP: 1, Dt: 1 },
   { PP: 1, Do: 1, L: 1 }, { PP: 1, Do: 1, S: 1 },
   ...dir4({ PP: 1, Do: 1 }, 1),
@@ -136,10 +154,10 @@ const ELS_CIRSOC = [
   ...dir2({ PP: 0.6, De: 0.6 }, "Eex", "Eey", 0.7),
   { PP: 1, Do: 1, Ts: 1 },
   ...psv({ PP: 1, Do: 1 }),
-];
+]);
 
 // ASCE 7-16 §2.4.1 (ASD): viento 0,6W, sismo 0,7E, factor 0,75 en simultáneas.
-const ELS_ASCE716 = [
+const ELS_ASCE716 = conDs([
   { PP: 1, De: 1 }, { PP: 1, Do: 1 }, { PP: 1, Dt: 1 },
   { PP: 1, Do: 1, L: 1 }, { PP: 1, Do: 1, S: 1 },
   ...dir4({ PP: 1, Do: 1 }, 0.6),
@@ -149,11 +167,11 @@ const ELS_ASCE716 = [
   ...dir2({ PP: 0.6, De: 0.6 }, "Eex", "Eey", 0.7),
   { PP: 1, Do: 1, Ts: 1 },
   ...psv({ PP: 1, Do: 1 }),
-];
+]);
 
 // PIP STC01015 — Tabla 4, ASD. Casos de levantamiento por viento (4-7) y sismo (4-8) en
 // operación y en vacío, con 0,6D.
-const ELS_PIP = [
+const ELS_PIP = conDs([
   { PP: 1, Do: 1 }, { PP: 1, Dt: 1 },
   { PP: 1, Do: 1, L: 1 }, { PP: 1, Do: 1, S: 1 },
   ...dir4({ PP: 1, Do: 1 }, 0.6),
@@ -165,7 +183,7 @@ const ELS_PIP = [
   ...dir2({ PP: 0.6, De: 0.6 }, "Eex", "Eey", 0.7),
   { PP: 1, Do: 1, Ts: 1 },
   ...psv({ PP: 1, Do: 1 }),
-];
+]);
 
 export const NORMATIVAS_ELS = {
   pp: { label: "Set patrón de la app", combos: DEF_ELS,

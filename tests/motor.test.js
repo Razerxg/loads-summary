@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { trasladar, detalleTraslado, nivelesOrdenados, mkNivel, NIVEL_REF } from '../src/engine/traslado.js';
-import { combinar, tablaCombos, envolvente, tablaHipotesis, calcular } from '../src/engine/combinar.js';
+import { combinar, tablaCombos, envolvente, tablaHipotesis, calcular,
+  cargaDs, cargasEnNivel } from '../src/engine/combinar.js';
 import { COMP_KEYS } from '../src/constants/componentes.js';
 
 const E = (o = {}) => ({ N: 0, Vx: 0, Vy: 0, Myy: 0, Mxx: 0, T: 0, ...o });
@@ -229,5 +230,96 @@ describe("tablas", () => {
     expect(r.elu[0].esf.Myy).toBeCloseTo(4.8 + 7.2 * 2, 9);
     // y el sin trasladar queda disponible para comparar
     expect(r.elu[0].esf0.Myy).toBeCloseTo(4.8, 9);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// EL PESO PROPIO DE LA FUNDACIÓN
+//
+// `Ds` no sale de la planilla y nunca va a salir: el modelo de CYPE termina en el nudo, que
+// es la cara superior de la fundación. Aparece recién al bajar a la cota de desplante, y por
+// eso su valor es del NIVEL y no del nudo.
+// ═══════════════════════════════════════════════════════════════════════════════
+describe("Ds — peso propio de la fundación", () => {
+  const cargas = { PP: E({ N: 10, Vx: 2, Myy: 1 }), Do: E({ N: 20, Vx: 4, Myy: 3 }) };
+  const hips = ["Ds", "PP", "Do"];
+  const combosU = [{ k: "a", f: { Ds: 1.4, PP: 1.4, Do: 1.4 } }];
+  const combosS = [{ k: "c", f: { Ds: 1, PP: 1, Do: 1 } }];
+
+  it("es una fuerza vertical pura: sin cortes y sin momentos", () => {
+    const d = cargaDs(35);
+    expect(d.N).toBe(35);
+    for (const k of COMP_KEYS.filter(x => x !== "N")) expect(d[k]).toBe(0);
+  });
+
+  // El signo importa: `N` es positiva en compresión sobre el apoyo, y el peso de la
+  // fundación comprime. Cargarlo negativo lo restaría de la carga vertical.
+  it("un Ds positivo AUMENTA el axial", () => {
+    const sin = calcular({ cargas, hips, combosU, combosS, h: 1.5 });
+    const con = calcular({ cargas, hips, combosU, combosS, h: 1.5, ds: 35 });
+    expect(con.elu[0].esf.N).toBeCloseTo(sin.elu[0].esf.N + 1.4 * 35, 9);
+  });
+
+  // No es una suma al final: entra en la combinación y lleva SU coeficiente. Sumarlo después
+  // daría el mismo número sólo cuando el factor vale 1, y en ELU nunca vale 1.
+  it("entra con el factor de la combinación, no como suma posterior", () => {
+    const u = calcular({ cargas, hips, combosU, combosS, h: 0, ds: 100 });
+    const s = calcular({ cargas, hips, combosU, combosS, h: 0, ds: 100 });
+    expect(u.elu[0].esf.N - u.els[0].esf.N).toBeCloseTo(
+      (1.4 - 1) * (10 + 20 + 100), 9);
+    expect(s.els[0].esf.N).toBeCloseTo(10 + 20 + 100, 9);
+  });
+
+  // En las combinaciones de levantamiento el peso de la fundación es ESTABILIZANTE, así que
+  // minorarlo (0,9) es lo conservador. Se comprueba que el factor se respeta y no se fuerza 1.
+  it("respeta el factor minorado de las combinaciones de levantamiento", () => {
+    const r = calcular({
+      cargas, hips, combosU: [{ k: "l", f: { Ds: 0.9, PP: 0.9 } }], combosS: [], h: 0, ds: 50,
+    });
+    expect(r.elu[0].esf.N).toBeCloseTo(0.9 * 10 + 0.9 * 50, 9);
+  });
+
+  // Como no tiene corte, trasladarlo es una operación nula. Eso es lo que permite inyectarlo
+  // sin un camino aparte, y hay que dejarlo fijado: si algún día Ds llevara corte, este test
+  // avisa que el traslado deja de ser inocuo.
+  it("no aporta momento al trasladar, porque no tiene corte", () => {
+    const sinDs = calcular({ cargas, hips, combosU, combosS, h: 2 });
+    const conDs = calcular({ cargas, hips, combosU, combosS, h: 2, ds: 80 });
+    expect(conDs.elu[0].esf.Myy).toBeCloseTo(sinDs.elu[0].esf.Myy, 9);
+    expect(conDs.elu[0].esf.Mxx).toBeCloseTo(sinDs.elu[0].esf.Mxx, 9);
+  });
+
+  // Con ds = 0 la clave NO se agrega: el nivel de referencia no puede arrastrar una hipótesis
+  // en cero que después haya que explicar en cada tabla.
+  it("con ds = 0 la hipótesis no se inyecta", () => {
+    expect(cargasEnNivel(cargas, 0)).not.toHaveProperty("Ds");
+    expect(cargasEnNivel(cargas, 35)).toHaveProperty("Ds");
+  });
+
+  // En el nudo, Ds vale cero POR DEFINICIÓN —no hay fundación arriba— así que el aviso
+  // genérico de «hipótesis con factor pero sin cargas» sería ruido en cada combinación.
+  it("Ds nunca aparece en el aviso de hipótesis faltantes", () => {
+    const r = calcular({ cargas, hips, combosU, combosS, h: 0, ds: 0 });
+    expect(r.faltantes).not.toContain("Ds");
+  });
+
+  // Lo que SÍ hay que avisar es lo contrario: una cota en profundidad cuyas combinaciones
+  // usan Ds y que no tiene el peso cargado. Ése es un olvido real y da un N menor y
+  // perfectamente plausible.
+  it("avisa cuando un nivel EN PROFUNDIDAD usa Ds y no lo tiene cargado", () => {
+    expect(calcular({ cargas, hips, combosU, combosS, h: 1.5, ds: 0 }).sinDs).toBe(true);
+    expect(calcular({ cargas, hips, combosU, combosS, h: 1.5, ds: 40 }).sinDs).toBe(false);
+    // en el nudo no se avisa: ahí el cero es correcto
+    expect(calcular({ cargas, hips, combosU, combosS, h: 0, ds: 0 }).sinDs).toBe(false);
+    // y tampoco si las combinaciones no usan Ds
+    expect(calcular({ cargas, hips, combosU: [{ k: "x", f: { PP: 1.4 } }], combosS: [],
+      h: 1.5, ds: 0 }).sinDs).toBe(false);
+  });
+
+  it("aparece en el resumen por hipótesis del nivel con su valor", () => {
+    const r = calcular({ cargas, hips, combosU, combosS, h: 1.5, ds: 42 });
+    const fila = r.hipotesis.find(x => x.hip === "Ds");
+    expect(fila.esf.N).toBe(42);
+    expect(fila.sinDatos).toBe(false);
   });
 });

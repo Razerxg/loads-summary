@@ -30,7 +30,8 @@ crecen por el brazo del corte.
 | `src/engine/traslado.js` | `M + V·h`, criterio de signos, niveles |
 | `src/services/leerXlsx.js` | lector de `.xlsx` a mano (ZIP + SpreadsheetML), sin dependencias |
 | `src/constants/` | componentes, catálogo de hipótesis, sets de combinación |
-| `src/components/tabs/` | una pestaña por etapa (Guía · Importar · Hipótesis · Combinaciones · Niveles · Resultados) |
+| `src/components/tabs/` | una pestaña por etapa (Guía · Importar · Hipótesis · Combinaciones · Niveles · Resultados · Reporte) |
+| `src/services/exportWord.js` | copiar al portapapeles con formato y bajar el `.doc` |
 | `src/context/ProyectoContext.jsx` | estado global, autoguardado en `localStorage`, export/import JSON |
 
 Portado de `bases-v-0.1`: el sistema de diseño entero (`tokens.js`, `styles.js`, `ui.jsx`,
@@ -114,6 +115,51 @@ Portado de `bases-v-0.1`: el sistema de diseño entero (`tokens.js`, `styles.js`
   mezcladas con las importadas más de una vez —la planilla no traía todas las hipótesis y las
   que faltaban conservaban los valores del ejemplo—, y eso no falla: da un resultado plausible
   y equivocado. Por el mismo motivo, «Reemplazar los nudos» viene tildado por defecto.
+
+- **`Ds` ES UNA PROPIEDAD DEL NIVEL, NO DEL NUDO.** El peso propio de la fundación no sale de
+  la planilla y nunca va a salir: el modelo de CYPE termina en el nudo, que es la cara
+  superior de la fundación. A 0,00 m no hay nada de fundación arriba y a 1,50 m hay todo lo
+  que haya entre las dos cotas, así que su valor vive en el nivel (`nv.ds`, en kN) y se
+  inyecta como una carga más de ese nivel (`cargasEnNivel`).
+  · **Entra en la combinación con SU coeficiente**, no como una suma al final. Sumarlo después
+    daría el mismo número sólo cuando el factor vale 1, y en ELU nunca vale 1. En las
+    combinaciones de levantamiento va minorado (0,9 / 0,6), que es donde minorar es lo
+    conservador; hay un test que lo exige.
+  · **Es fuerza vertical pura y positiva:** `N` es positiva en compresión y el peso comprime.
+    No genera momento, lo que supone resultante centrada —correcto para zapata simétrica bajo
+    el pedestal, no para una fundación excéntrica—. No contempla subpresión.
+  · Como no tiene corte, **trasladarlo es una operación nula**, y por eso puede entrar antes
+    del traslado sin ningún caso especial. Hay un test que lo fija: si algún día `Ds` llevara
+    corte, ese test avisa que el traslado deja de ser inocuo.
+  · `Ds` **queda fuera del aviso genérico** de «hipótesis con factor pero sin cargas»: en el
+    nudo vale cero por definición. El aviso que sí existe es el contrario (`sinDs`): un nivel
+    en profundidad cuyas combinaciones usan `Ds` y que no lo tiene cargado.
+  · En la matriz de combinaciones, **`Ds` viaja pegado a `PP`** y se deriva con `conDs()` en
+    vez de escribirse en las ochenta filas. Dos números que tienen que ser iguales repetidos
+    ochenta veces terminan distintos, y un `Ds` mal factorizado da un total plausible.
+
+- **LA MEMORIA USA TRES COLUMNAS PARA LAS COMBINACIONES, NO UNA MATRIZ DE φ.**
+  `Nomenclatura · Combinación específica · Descripción`, igual que `bases-v-0.1`. Se probó la
+  matriz con una columna por hipótesis: son diecinueve columnas, y en una A4 vertical la
+  última queda con ochenta píxeles y parte cada palabra en un renglón. Medido: la memoria
+  pasaba de 8.400 a 17.300 px de alto. La expresión escrita lleva la misma información.
+
+- **`comboDescNatural` USA EL NOMBRE CORTO DEL CATÁLOGO** (campo `corto`), no el rótulo largo.
+  Con el largo, una fila corriente se describía como «Peso propio de la fundación + Peso
+  propio (del modelo) + Peso en operación + Sobrecarga de uso + Nieve + viento». Los cuatro
+  vientos colapsan en «viento» y los cuatro sismos en «sismo». Hay test.
+
+- **LO QUE SE COPIA ES EL DOM VIVO, no una segunda representación en HTML de cadena.** Copiar
+  y bajar el `.doc` leen el nodo que está en pantalla, así que lo que se pega es literalmente
+  lo que se ve. Dos versiones —una para mirar y otra para exportar— divergen, y nadie lo nota
+  hasta que el número está en un plano.
+  · Los botones «copiar» viven DENTRO de la memoria, al lado de cada epígrafe, porque el uso
+    real es «necesito ESTA tabla», no «copio todo». Llevan la clase `bx-nocopy`, que
+    `prepararNodo` barre antes de exportar: sin eso, cada tabla llegaría al Word con la
+    palabra «copiar» encima. Hay verificación en navegador de que el HTML copiado trae una
+    sola `<table>` y ningún `<button>`.
+  · Se escribe `text/html` **y** `text/plain` en el mismo evento, con un camino de respaldo por
+    `execCommand` para navegadores sin `ClipboardItem` o con el permiso denegado.
 
 ## Trampas conocidas del código
 

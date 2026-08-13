@@ -109,9 +109,20 @@ function BloqueNivel({ r, abierto }) {
       titulo={rotuloNivel(r.nivel)}
       desc={esRef
         ? "Los esfuerzos tal como los entregó el modelo, sin trasladar. Es la referencia contra la que se comparan los demás niveles."
-        : `Trasladado ${f2(r.nivel.h)} m por debajo del nudo, ${MODOS[modo].corto}. Las fuerzas no cambian; los momentos sí.`}
+        : `Trasladado ${f2(r.nivel.h)} m por debajo del nudo, ${MODOS[modo].corto}. Las fuerzas no cambian; los momentos sí.`
+          + (r.ds ? ` Incluye Ds = ${f2(r.ds)} kN de peso propio de fundación, con su factor por combinación.` : "")}
       acciones={<Boton onClick={exportar}>⤓ CSV</Boton>}
     >
+      {r.sinDs && (
+        <div style={{ marginBottom: SP.md, padding: SP.md, borderRadius: R.md,
+          background: c.ambarBg, border: `1px solid ${c.ambarBd}`, ...t.body, color: c.txt }}>
+          ⚠ Las combinaciones usan <code>Ds</code> pero este nivel tiene el peso propio de la
+          fundación <b>en cero</b>. A una cota por debajo del nudo eso casi nunca es correcto: la
+          zapata y el suelo que gravita encima pesan, y sin ellos el <code>N</code> sale menor —y
+          perfectamente plausible—. Cargalo en <b>Niveles</b>, o poné <code>φDs</code> en cero si
+          de verdad no corresponde.
+        </div>
+      )}
       <Acordeon titulo="Esfuerzos por hipótesis en este nivel"
         resumen={`${r.hipotesis.length} hipótesis`} abierto={false}>
         <DataTable cols={colsEsf("Hipótesis")} buscar={false} maxAlto={360}

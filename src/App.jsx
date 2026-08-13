@@ -16,11 +16,17 @@ import { HipotesisTab } from './components/tabs/HipotesisTab.jsx';
 import { CombinacionesTab } from './components/tabs/CombinacionesTab.jsx';
 import { NivelesTab } from './components/tabs/NivelesTab.jsx';
 import { ResultadosTab } from './components/tabs/ResultadosTab.jsx';
+import { ReporteTab } from './components/tabs/ReporteTab.jsx';
 
 const PANELS = {
   "Guía": GuiaTab, "Importar": ImportarTab, "Hipótesis": HipotesisTab,
   "Combinaciones": CombinacionesTab, "Niveles": NivelesTab, "Resultados": ResultadosTab,
+  "Reporte": ReporteTab,
 };
+
+// El Reporte usa TODO el ancho disponible: es un documento de hoja A4 y acotarlo al ancho de
+// contenido del resto de la app le mete una barra de desplazamiento horizontal permanente.
+const ANCHO_LIBRE = new Set(["Reporte"]);
 
 const CLAVE_TEMA = "reacciones.tema";
 
@@ -152,7 +158,8 @@ function Shell() {
       <div style={{ minWidth: 0 }}>
         <BarraSuperior onNav={() => setNav(v => !v)} tema={tema} setTema={setTema} />
         <main className="bx-main" style={{ padding: `${SP.lg}px ${SP.lg}px ${SP.xxl}px`,
-          maxWidth: ANCHO_CONTENIDO, margin: "0 auto", minWidth: 0 }}>
+          maxWidth: ANCHO_LIBRE.has(nombre) ? "none" : ANCHO_CONTENIDO,
+          margin: "0 auto", minWidth: 0 }}>
           <h1 style={{ ...t.h1, margin: `0 0 ${SP.lg}px` }}>{nombre}</h1>
           <Panel />
         </main>

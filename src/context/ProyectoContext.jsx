@@ -132,6 +132,9 @@ export function ProyectoProvider({ children }) {
     ...calcular({
       cargas: nudoAct?.cargas || {}, hips: st.hips,
       combosU: st.combosU, combosS: st.combosS, h: nv.h, modo: st.modo,
+      // El peso propio de la fundación es del NIVEL: cada cota acumula lo que haya entre
+      // ella y el nudo. El de referencia lo lleva en cero por definición.
+      ds: nv.fijo ? 0 : nv.ds,
     }),
   })), [niveles, nudoAct, st.hips, st.combosU, st.combosS, st.modo]);
 
@@ -140,7 +143,7 @@ export function ProyectoProvider({ children }) {
     tipo: ARCHIVO_TIPO, version: 1, generado: new Date().toISOString(),
     proyecto: st.proyecto, hips: st.hips, modo: st.modo,
     nudos: st.nudos.map(n => ({ nombre: n.nombre, cargas: n.cargas })),
-    niveles: st.niveles.map(n => ({ nombre: n.nombre, h: n.h })),
+    niveles: st.niveles.map(n => ({ nombre: n.nombre, h: n.h, ds: n.ds })),
     // Sin las claves `k` de sesión: son `Math.random()` y no significan nada fuera de ella.
     combos: { ELU: st.combosU.map(c => c.f), ELS: st.combosS.map(c => c.f) },
   }), [st]);
@@ -160,7 +163,8 @@ export function ProyectoProvider({ children }) {
       nudoAct: 0,
       combosU: Array.isArray(d.combos?.ELU) ? d.combos.ELU.map(f => mkCombo({ ...f })) : base.combosU,
       combosS: Array.isArray(d.combos?.ELS) ? d.combos.ELS.map(f => mkCombo({ ...f })) : base.combosS,
-      niveles: Array.isArray(d.niveles) ? d.niveles.map(n => mkNivel(n.nombre || "Nivel", Number(n.h) || 0)) : [],
+      niveles: Array.isArray(d.niveles)
+        ? d.niveles.map(n => mkNivel(n.nombre || "Nivel", Number(n.h) || 0, Number(n.ds) || 0)) : [],
       modo: d.modo === "envolvente" ? "envolvente" : MODO_DEF,
     });
     return { ok: true };

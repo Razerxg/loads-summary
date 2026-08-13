@@ -27,28 +27,52 @@ import { num } from '../engine/utils.js';
 // [clave, rótulo, familia]. La FAMILIA es lo único que la app usa para algo: marca las
 // acciones ACCIDENTALES (viento, sismo, accidentales), que se señalan en el listado de
 // combinaciones porque suelen llevar otro criterio de admisibles aguas abajo.
+// ⚠ `Ds` NO SALE DE LA PLANILLA Y NUNCA VA A SALIR. Es el peso propio de la FUNDACIÓN
+// —zapata, pedestal y el suelo que gravita encima— y el modelo de CYPE no lo tiene: el
+// modelo termina en el nudo, que es justamente la cara superior de la fundación. Aparece
+// recién cuando las cargas se bajan a la cota de desplante, y por eso su valor es una
+// propiedad DEL NIVEL y no del nudo: a 0,00 m no hay nada de fundación arriba, y a 1,50 m
+// hay todo lo que haya entre esas dos cotas. Se marca con `porNivel` para que la pantalla de
+// hipótesis no lo ofrezca como un campo más del nudo, donde no significaría nada.
+// La cuarta columna es el nombre CORTO de la acción, y no es un adorno: es lo que se imprime
+// en la columna «Acciones» del listado de combinaciones. Con el rótulo largo, una fila como
+// `1,2·Ds + 1,2·PP + 1,2·Do + 1,0·L + 0,5·S + 1,0·Wx+` se describía como «Peso propio de la
+// fundación + Peso propio (del modelo) + Peso en operación + Sobrecarga de uso + Nieve +
+// viento» y estiraba cada fila de la memoria a seis renglones.
+//
+// Los cuatro vientos comparten «viento» y los cuatro sismos «sismo», a propósito: en la
+// descripción en palabras el sentido no aporta —lo aportan las columnas de coeficientes— y
+// repetirlo cuatro veces sólo ensucia.
 const CAT = [
-  ["PP", "Peso propio (del modelo)", "permanente"],
-  ["De", "Peso en vacío", "permanente"],
-  ["Do", "Peso en operación", "permanente"],
-  ["Dt", "Peso en prueba hidráulica", "permanente"],
-  ["L", "Sobrecarga de uso", "variable"],
-  ["S", "Nieve", "variable"],
-  ["Wx+", "Viento +X", "accidental"],
-  ["Wx-", "Viento −X", "accidental"],
-  ["Wy+", "Viento +Y", "accidental"],
-  ["Wy-", "Viento −Y", "accidental"],
-  ["Eex", "Sismo X (masa en vacío)", "accidental"],
-  ["Eey", "Sismo Y (masa en vacío)", "accidental"],
-  ["Eox", "Sismo X (masa en operación)", "accidental"],
-  ["Eoy", "Sismo Y (masa en operación)", "accidental"],
-  ["Ts", "Térmica / fricción", "variable"],
-  ["F1", "Accidental F1 (disparo de PSV)", "accidental"],
-  ["F2", "Accidental F2 (disparo de PSV)", "accidental"],
+  ["Ds", "Peso propio de la fundación", "permanente", "peso de fundación", true],
+  ["PP", "Peso propio (del modelo)", "permanente", "peso propio"],
+  ["De", "Peso en vacío", "permanente", "vacío"],
+  ["Do", "Peso en operación", "permanente", "operación"],
+  ["Dt", "Peso en prueba hidráulica", "permanente", "prueba hidráulica"],
+  ["L", "Sobrecarga de uso", "variable", "sobrecarga"],
+  ["S", "Nieve", "variable", "nieve"],
+  ["Wx+", "Viento +X", "accidental", "viento"],
+  ["Wx-", "Viento −X", "accidental", "viento"],
+  ["Wy+", "Viento +Y", "accidental", "viento"],
+  ["Wy-", "Viento −Y", "accidental", "viento"],
+  ["Eex", "Sismo X (masa en vacío)", "accidental", "sismo"],
+  ["Eey", "Sismo Y (masa en vacío)", "accidental", "sismo"],
+  ["Eox", "Sismo X (masa en operación)", "accidental", "sismo"],
+  ["Eoy", "Sismo Y (masa en operación)", "accidental", "sismo"],
+  ["Ts", "Térmica / fricción", "variable", "térmica"],
+  ["F1", "Accidental F1 (disparo de PSV)", "accidental", "disparo de PSV"],
+  ["F2", "Accidental F2 (disparo de PSV)", "accidental", "disparo de PSV"],
 ];
 
-export const HIP_CAT = CAT.map(([k, rotulo, familia]) => ({ k, rotulo, familia }));
+export const HIP_CAT = CAT.map(([k, rotulo, familia, corto, porNivel = false]) =>
+  ({ k, rotulo, familia, corto, porNivel }));
 export const CAT_POR_K = Object.fromEntries(HIP_CAT.map(h => [h.k, h]));
+
+// Clave de la hipótesis cuyo valor lo pone el NIVEL y no el nudo. Hay una sola y por ahora
+// alcanza, pero se nombra en vez de escribir "Ds" por todos lados: si mañana hubiera otra
+// —el empuje del suelo sobre el pedestal, por ejemplo— el cambio queda acotado.
+export const HIP_DS = "Ds";
+export const esPorNivel = (k) => !!CAT_POR_K[k]?.porNivel;
 
 // Las que arrancan activas. Es el juego que trae un modelo de proceso típico; el resto se
 // agrega solo al importar, y las que sobran se borran de a una.
@@ -78,13 +102,14 @@ export const comboDesc = (f, hips) => (hips || Object.keys(f || {}))
 
 // Descripción en palabras, sin repetir: "operación + viento". Sirve para la columna
 // «Descripción» del listado, donde la expresión con factores es demasiado larga.
+// Se usa el nombre CORTO del catálogo, no el rótulo largo, y las repeticiones se colapsan:
+// los cuatro vientos dicen todos «viento». Una hipótesis que no esté en el catálogo entra
+// con su propio nombre, que es lo único que se sabe de ella.
 export const comboDescNatural = (f, hips) => {
   const vistas = [];
   for (const k of (hips || Object.keys(f || {}))) {
     if (num(f?.[k], 0) === 0) continue;
-    // Los cuatro vientos dicen todos «viento», y los cuatro sismos «sismo»: en la
-    // descripción en palabras el sentido no aporta, lo aporta la expresión con factores.
-    const w = VIENTOS.includes(k) ? "viento" : SISMOS.includes(k) ? "sismo" : rotuloHip(k);
+    const w = CAT_POR_K[k]?.corto || k;
     if (!vistas.includes(w)) vistas.push(w);
   }
   return vistas.length ? vistas.join(" + ") : "—";

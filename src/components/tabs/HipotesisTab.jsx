@@ -15,7 +15,7 @@ import { Card, Boton, Badge, Ayuda, Divisor, Siguiente, useToast } from '../ui.j
 import { SelectorNudo } from '../SelectorNudo.jsx';
 import { useProyecto } from '../../context/ProyectoContext.jsx';
 import { COMPONENTES, COMP_KEYS } from '../../constants/componentes.js';
-import { rotuloHip, familiaHip, CAT_POR_K, HIP_CAT } from '../../constants/hipotesis.js';
+import { rotuloHip, familiaHip, esPorNivel, CAT_POR_K, HIP_CAT } from '../../constants/hipotesis.js';
 import { useState } from 'react';
 
 const CELDA = { width: 82, padding: "3px 5px", fontSize: TAM.base, textAlign: "right" };
@@ -30,7 +30,12 @@ export function HipotesisTab() {
   const [nueva, setNueva] = useState("");
 
   const cargas = nudoAct?.cargas || {};
-  const sinDatos = hips.filter(h => !cargas[h]);
+  // `Ds` —y cualquier otra hipótesis `porNivel`— no se edita acá: su valor no es del nudo
+  // sino de la cota, y ofrecerla como un campo más de esta tabla invitaría a cargar el peso
+  // de la zapata a una altura donde la fundación todavía no existe.
+  const editables = hips.filter(h => !esPorNivel(h));
+  const deNivel = hips.filter(h => esPorNivel(h));
+  const sinDatos = editables.filter(h => !cargas[h]);
 
   const agregar = () => {
     const k = nueva.trim();
@@ -59,7 +64,7 @@ export function HipotesisTab() {
             <th style={{ ...s.th, width: 34 }}></th>
           </tr></thead>
           <tbody>
-            {hips.map(h => {
+            {editables.map(h => {
               const c0 = cargas[h] || {};
               const vacia = !cargas[h];
               return (
@@ -113,7 +118,7 @@ export function HipotesisTab() {
         <Boton onClick={agregar} disabled={!nueva.trim()}>+ Agregar</Boton>
         <select style={s.sel} value="" onChange={e => { if (e.target.value) { addHips([e.target.value]); toast(`Agregada «${e.target.value}».`, "ok"); } }}>
           <option value="">…o traer una del catálogo</option>
-          {HIP_CAT.filter(h => !hips.includes(h.k)).map(h => (
+          {HIP_CAT.filter(h => !hips.includes(h.k) && !h.porNivel).map(h => (
             <option key={h.k} value={h.k}>{h.k} — {h.rotulo}</option>
           ))}
         </select>
@@ -127,11 +132,26 @@ export function HipotesisTab() {
         </Ayuda>
       </div>
       <div style={s.note}>
-        {hips.length} hipótesis · quitar una borra <b>también su factor</b> en todas las
+        {editables.length} hipótesis del nudo · quitar una borra <b>también su factor</b> en todas las
         combinaciones. Sin eso, el factor quedaba escondido en el objeto: la columna
         desaparecía de la pantalla pero la hipótesis seguía sumando al total.
       </div>
     </Card>
+
+    {!!deNivel.length && (
+      <Card titulo="Hipótesis que no se cargan acá">
+        <div style={{ ...t.body, color: c.txt }}>
+          <code>{deNivel.join(", ")}</code> {deNivel.length > 1 ? "tienen" : "tiene"} su valor
+          definido <b>por nivel</b>, no por nudo, así que no {deNivel.length > 1 ? "aparecen" : "aparece"} en
+          la tabla de arriba. <code>Ds</code> es el peso propio de la fundación: por encima del
+          nudo no hay fundación, y a cada cota hay lo que haya entre esa cota y el nudo. Se carga
+          en <b>Niveles</b>, y su columna <code>φDs</code> sí está en la matriz de combinaciones.
+        </div>
+        <div style={{ marginTop: SP.md }}>
+          <Boton onClick={() => irA("Niveles")}>Ir a Niveles →</Boton>
+        </div>
+      </Card>
+    )}
 
     <Siguiente irA={irA} atras="Importar" a="Combinaciones"
       txt="Con las hipótesis cargadas:" />

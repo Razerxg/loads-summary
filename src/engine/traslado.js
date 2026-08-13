@@ -103,11 +103,15 @@ export function detalleTraslado(esf, h, modo = MODO_DEF) {
 //
 // El nivel de referencia (`h = 0`) EXISTE SIEMPRE y no se puede borrar: es el nudo tal como
 // lo entregó el modelo, y es contra lo que se compara todo lo demás.
-export const NIVEL_REF = { id: "ref", nombre: "Nudo (nivel del modelo)", h: 0, fijo: true };
+// `ds` es el PESO PROPIO DE LA FUNDACIÓN acumulado entre el nudo y esta cota, en kN. Vive en
+// el nivel y no en el nudo porque eso es lo que es: a 0,00 m no hay nada de fundación
+// arriba, y a 1,50 m hay todo lo que haya entre las dos cotas. El de referencia lo lleva
+// fijo en cero, y no es un default editable: no existe fundación por encima del nudo.
+export const NIVEL_REF = { id: "ref", nombre: "Nudo (nivel del modelo)", h: 0, ds: 0, fijo: true };
 
 let seqNivel = 0;
-export const mkNivel = (nombre = "", h = 1) =>
-  ({ id: `nv${++seqNivel}${Math.random().toString(36).slice(2, 6)}`, nombre, h, fijo: false });
+export const mkNivel = (nombre = "", h = 1, ds = 0) =>
+  ({ id: `nv${++seqNivel}${Math.random().toString(36).slice(2, 6)}`, nombre, h, ds, fijo: false });
 
 // Los niveles ordenados y con el de referencia adelante. Se ordena por profundidad para que
 // la pantalla lea de arriba hacia abajo como el terreno: el nudo primero y lo más profundo
