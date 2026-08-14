@@ -316,6 +316,28 @@ describe("Ds — peso propio de la fundación", () => {
       h: 1.5, ds: 0 }).sinDs).toBe(false);
   });
 
+  // La primera versión limpiaba `Ds` sólo de la lista agregada, así que el aviso general
+  // desaparecía pero CADA combinación seguía mostrando su ⚠. En el nivel de referencia —donde
+  // Ds vale cero por definición— salían marcadas las cuarenta y ocho, y un aviso que aparece
+  // siempre deja de leerse: el día que uno sea de verdad, ya nadie lo mira.
+  it("Ds tampoco aparece en el aviso de CADA combinación", () => {
+    const r = calcular({ cargas, hips, combosU, combosS, h: 0, ds: 0 });
+    for (const f of [...r.elu, ...r.els]) {
+      expect(f.faltan, `${f.nombre} marca Ds como faltante`).not.toContain("Ds");
+    }
+  });
+
+  // Pero una hipótesis que SÍ falta de verdad se sigue marcando: el filtro es de `Ds`, no de
+  // todo el aviso.
+  it("una hipótesis realmente ausente se sigue marcando en su fila", () => {
+    const r = calcular({
+      cargas, hips: [...hips, "S"],
+      combosU: [{ k: "a", f: { Ds: 1.2, PP: 1.2, S: 1.6 } }], combosS: [], h: 0, ds: 0,
+    });
+    expect(r.elu[0].faltan).toEqual(["S"]);
+    expect(r.faltantes).toEqual(["S"]);
+  });
+
   it("aparece en el resumen por hipótesis del nivel con su valor", () => {
     const r = calcular({ cargas, hips, combosU, combosS, h: 1.5, ds: 42 });
     const fila = r.hipotesis.find(x => x.hip === "Ds");

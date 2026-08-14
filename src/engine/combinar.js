@@ -160,14 +160,22 @@ export function calcular({ cargas, hips, combosU, combosS, h = 0, modo = MODO_DE
   // nivel EN PROFUNDIDAD cuyas combinaciones usan `Ds` y que no tiene el peso cargado. Ése es
   // un olvido real, y da un total menor y perfectamente plausible.
   const usaDs = [...combosU, ...combosS].some(c => n0((c.f ?? c)?.[HIP_DS]) !== 0);
-  const faltantes = [...new Set([...elu, ...els].flatMap(f => f.faltan))].filter(k => k !== HIP_DS);
+  // Se limpia el `faltan` de CADA FILA y no sólo el agregado. La primera versión filtraba
+  // únicamente la lista de arriba, así que el aviso general desaparecía pero cada combinación
+  // seguía mostrando su ⚠: en el nivel de referencia —donde `Ds` vale cero por definición—
+  // salían marcadas las cuarenta y ocho, y un aviso que aparece siempre deja de leerse. El
+  // día que uno sea de verdad, ya nadie lo mira.
+  const limpiar = (fs) => fs.map(f => (f.faltan.includes(HIP_DS)
+    ? { ...f, faltan: f.faltan.filter(k => k !== HIP_DS) } : f));
+  const eluL = limpiar(elu), elsL = limpiar(els);
+  const faltantes = [...new Set([...eluL, ...elsL].flatMap(f => f.faltan))];
 
   return {
-    hipotesis, elu, els, ds: n0(ds),
-    envELU: envolvente(elu), envELS: envolvente(els),
+    hipotesis, elu: eluL, els: elsL, ds: n0(ds),
+    envELU: envolvente(eluL), envELS: envolvente(elsL),
     // Los avisos se calculan UNA vez acá y no en cada tabla: son del cálculo entero.
     faltantes,
-    vacias: [...elu, ...els].filter(f => f.vacia).map(f => f.nombre),
+    vacias: [...eluL, ...elsL].filter(f => f.vacia).map(f => f.nombre),
     sinDs: usaDs && n0(h) !== 0 && n0(ds) === 0,
     usaDs,
   };

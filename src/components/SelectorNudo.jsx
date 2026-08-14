@@ -20,9 +20,16 @@ import { Badge, Ayuda } from './ui.jsx';
 import { useProyecto } from '../context/ProyectoContext.jsx';
 import { f2 } from '../engine/utils.js';
 
+// A partir de cuántos nudos la lista de casillas arranca plegada. Doce entra en dos
+// renglones; de ahí para arriba empieza a comerse la pantalla.
+const UMBRAL_PLEGADO = 12;
+
 export function SelectorNudo({ conEditar = false, soloNudo = false }) {
   const { nudos, nudoAct, setNudoAct, set, addNudo, delNudo,
     conjunto, setConjunto, setIncluido, incluidos, suma } = useProyecto();
+  // Tildar o destildar los cien de una. Se hace en UNA sola actualización de estado y no
+  // con cien llamadas a `setIncluido`: cada una dispara un render y un recálculo completo.
+  const todos = (v) => set(st => ({ nudos: st.nudos.map(n => ({ ...n, incluido: v })) }));
   const i = nudos.findIndex(n => n.id === nudoAct?.id);
   // `soloNudo` es para la pantalla de Hipótesis: ahí se EDITA un nudo, y editar una suma no
   // tiene sentido. El modo sigue vigente en el resto de la app; simplemente no se ofrece acá.
@@ -100,20 +107,48 @@ export function SelectorNudo({ conEditar = false, soloNudo = false }) {
 
       {conjunto && !soloNudo && (
         <div style={{ borderTop: `1px solid ${c.border}`, padding: `${SP.sm}px ${SP.md}px` }}>
-          <div style={{ display: "flex", gap: SP.md, flexWrap: "wrap", alignItems: "center" }}>
-            <span style={t.eyebrow}>Nudos sobre esta fundación</span>
+          {/* ⚠ LA LISTA SE PLIEGA CUANDO HAY MUCHOS.
+              Con cien nudos —un rack, una batería de soportes— las casillas ocupaban ocho
+              renglones y trescientos píxeles de alto, y empujaban las tablas fuera de la
+              pantalla en cada visita, aunque el caso normal sea no tocar ninguna. Medido.
+              Con pocos se muestran directamente: plegar tres casillas es un clic de más para
+              nada. */}
+          <details open={nudos.length <= UMBRAL_PLEGADO}>
+            <summary style={{ cursor: "pointer", listStyle: "none", display: "flex",
+              alignItems: "center", gap: SP.sm, flexWrap: "wrap" }}>
+              <span style={t.eyebrow}>Nudos sobre esta fundación</span>
+              <span style={{ ...t.body, color: c.txt2 }}>
+                {incluidos.length === nudos.length
+                  ? `los ${nudos.length}`
+                  : `${incluidos.length} de ${nudos.length} — ${nudos.filter(n => n.incluido === false).length} excluidos`}
+              </span>
+              {/* Con cien nudos, tildarlos de a uno no es una opción. */}
+              <span onClick={e => e.preventDefault()} style={{ display: "inline-flex", gap: SP.xs }}>
+                <button style={{ ...s.btnG, padding: "3px 9px" }}
+                  onClick={() => todos(true)}>Todos</button>
+                <button style={{ ...s.btnG, padding: "3px 9px" }}
+                  onClick={() => todos(false)}>Ninguno</button>
+              </span>
+            </summary>
             {/* Una planilla suele traer TODOS los nudos del modelo, y esta fundación recibe
                 unos pocos: por eso se eligen. Sumarlos todos por defecto sería meter en la
                 cuenta apoyos de otra base. */}
-            {nudos.map(n => (
-              <label key={n.id} style={{ display: "inline-flex", alignItems: "center", gap: 5,
-                ...t.body, color: c.txt, cursor: "pointer", whiteSpace: "nowrap" }}>
-                <input type="checkbox" checked={n.incluido !== false}
-                  onChange={e => setIncluido(n.id, e.target.checked)} />
-                {n.nombre || "(sin nombre)"}
-              </label>
-            ))}
-          </div>
+            <div style={{ display: "flex", gap: `${SP.xs}px ${SP.md}px`, flexWrap: "wrap",
+              alignItems: "center", marginTop: SP.sm,
+              // Tope de alto con desplazamiento propio: con doscientos nudos, ni plegada la
+              // lista puede empujar la página entera hacia abajo.
+              maxHeight: 132, overflowY: "auto" }}>
+              {nudos.map(n => (
+                <label key={n.id} style={{ display: "inline-flex", alignItems: "center", gap: 5,
+                  ...t.body, color: n.incluido === false ? c.txt3 : c.txt,
+                  cursor: "pointer", whiteSpace: "nowrap" }}>
+                  <input type="checkbox" checked={n.incluido !== false}
+                    onChange={e => setIncluido(n.id, e.target.checked)} />
+                  {n.nombre || "(sin nombre)"}
+                </label>
+              ))}
+            </div>
+          </details>
           {!!suma?.avisos?.length && (
             <div style={{ ...s.note, color: C.yellow, marginTop: SP.sm }}>
               {suma.avisos.map((a, k) => <div key={k}>⚠ {a}</div>)}
