@@ -190,6 +190,21 @@ Portado de `bases-v-0.1`: el sistema de diseño entero (`tokens.js`, `styles.js`
   · Se escribe `text/html` **y** `text/plain` en el mismo evento, con un camino de respaldo por
     `execCommand` para navegadores sin `ClipboardItem` o con el permiso denegado.
 
+- **AGREGAR UNA HIPÓTESIS AL CATÁLOGO NO ALCANZA: HAY QUE MIGRAR** (`engine/migrar.js`).
+  Los proyectos viven en `localStorage` y en `.reacciones.json`, y al abrirlos se respetan sus
+  matrices —son del usuario—. Cuando el programa agregó `Ds`, todo proyecto anterior quedó sin
+  la columna `φDs`: el usuario cargaba el peso de la platea en Niveles, veía el campo lleno, y
+  **el número se multiplicaba por cero sin ningún error**. Pasó de verdad y lo reportó el
+  usuario. Hay test del modo de falla completo.
+  · Se agrega la hipótesis a la lista —en el ORDEN DEL CATÁLOGO y no al final, porque los
+    factores se guardan por nombre y el orden es puramente visual— y se copia el coeficiente
+    de `PP`, que es la regla con la que se arman los sets (`conDs`).
+  · **Si la combinación no tiene `PP`, no se inventa nada**: sin permanente de referencia,
+    poner 1,0 sería elegir por el usuario un número que cambia el resultado. Se listan aparte.
+  · **Se informa siempre** (`AvisoMigracion`), con tarjeta persistente y no con un toast: esto
+    modifica la matriz del usuario, y una migración muda es un cambio de números sin autor.
+  · Es idempotente, y un proyecto al día devuelve `cambios: null` para que no se muestre nada.
+
 ## Trampas conocidas del código
 
 - **Los campos de formulario son STRINGS**, no números: vienen de `<input type="number">`.

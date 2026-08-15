@@ -8,6 +8,7 @@ import { s, C, MONO } from '../styles.js';
 import { c, t, SP, R, TAM } from '../tokens.js';
 import { Card, Boton, Ayuda, Siguiente, useToast } from '../ui.jsx';
 import { useProyecto } from '../../context/ProyectoContext.jsx';
+import { AvisoMigracion } from '../AvisoMigracion.jsx';
 import { num } from '../../engine/utils.js';
 import { mkCombo, DEF_ELU, DEF_ELS, NORMATIVAS_ELU, NORMATIVAS_ELS } from '../../constants/combosDef.js';
 import { comboDescNatural, esAccidental, familiaHip, rotuloHip } from '../../constants/hipotesis.js';
@@ -177,6 +178,7 @@ function SetCombos() {
 export function CombinacionesTab() {
   const { combosU, setCombosU, combosS, setCombosS, hips, irA } = useProyecto();
   return (<>
+    <AvisoMigracion />
     <Card titulo="Criterio">
       <div style={{ ...t.body, color: c.txt }}>
         Las combinaciones <b>últimas (ELU)</b> mayoran las acciones y son con las que se

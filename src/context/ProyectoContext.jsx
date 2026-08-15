@@ -6,6 +6,7 @@
 // pestaña sería perder toda la sesión.
 import { createContext, useContext, useState, useMemo, useEffect, useCallback } from 'react';
 import { HIPS_DEF, agregarHips, quitarHip } from '../constants/hipotesis.js';
+import { migrarProyecto } from '../engine/migrar.js';
 import { DEF_ELU, DEF_ELS, mkCombo } from '../constants/combosDef.js';
 import { COMP_KEYS } from '../constants/componentes.js';
 import { calcular } from '../engine/combinar.js';
@@ -48,10 +49,18 @@ const inicial = () => ({
 
 // Lo que se persiste. Las claves `k`/`id` de sesión SÍ se guardan acá —a diferencia del
 // archivo exportado— porque restaurar el estado tal cual es justamente lo que se busca.
+// ⚠ SE MIGRA AL ABRIR, y el resultado se informa.
+//
+// Un proyecto guardado ANTES de que el programa agregara una hipótesis no la tiene ni en la
+// lista ni en las matrices. El usuario carga el valor, ve el campo lleno, y el número no
+// cambia en ninguna tabla: multiplicado por cero, sin ningún error. Ver `engine/migrar.js`.
+let ultimaMigracion = null;
 const cargarLocal = () => {
   try {
-    const d = JSON.parse(localStorage.getItem(CLAVE) || "null");
-    if (!d || typeof d !== "object") return null;
+    const crudo = JSON.parse(localStorage.getItem(CLAVE) || "null");
+    if (!crudo || typeof crudo !== "object") return null;
+    const { estado: d, cambios } = migrarProyecto(crudo, { ordenCatalogo: HIPS_DEF });
+    ultimaMigracion = cambios;
     const base = inicial();
     return {
       ...base, ...d,
@@ -69,6 +78,9 @@ const cargarLocal = () => {
 export function ProyectoProvider({ children }) {
   const [st, setSt] = useState(() => (typeof localStorage !== "undefined" ? cargarLocal() : null) || inicial());
   const [tab, setTab] = useState(0);
+  // El parte de la migración vive APARTE del proyecto: es de esta sesión y no algo que haya
+  // que volver a guardar. Se muestra hasta que el usuario lo acepta.
+  const [migracion, setMigracion] = useState(() => ultimaMigracion);
 
   useEffect(() => {
     try { localStorage.setItem(CLAVE, JSON.stringify(st)); } catch { /* cupo lleno: no rompe nada */ }
@@ -180,15 +192,22 @@ export function ProyectoProvider({ children }) {
         + "Para traer sólo las matrices usá «Importar set» en la pestaña Combinaciones." };
     }
     const base = inicial();
+    // Un `.reacciones.json` guardado antes tiene el mismo problema que el localStorage
+    // viejo, así que pasa por la misma migración.
+    const mig = migrarProyecto({
+      hips: d.hips, combosU: (d.combos?.ELU || []).map(f => ({ f })),
+      combosS: (d.combos?.ELS || []).map(f => ({ f })),
+    }, { ordenCatalogo: HIPS_DEF });
+    setMigracion(mig.cambios);
     setSt({
       proyecto: typeof d.proyecto === "string" ? d.proyecto : "",
-      hips: Array.isArray(d.hips) && d.hips.length ? d.hips : base.hips,
+      hips: Array.isArray(mig.estado.hips) && mig.estado.hips.length ? mig.estado.hips : base.hips,
       nudos: Array.isArray(d.nudos) && d.nudos.length
         ? d.nudos.map(n => ({ ...mkNudo(n.nombre || "N", n.cargas || {}), incluido: n.incluido !== false }))
         : base.nudos,
       nudoAct: 0,
-      combosU: Array.isArray(d.combos?.ELU) ? d.combos.ELU.map(f => mkCombo({ ...f })) : base.combosU,
-      combosS: Array.isArray(d.combos?.ELS) ? d.combos.ELS.map(f => mkCombo({ ...f })) : base.combosS,
+      combosU: Array.isArray(d.combos?.ELU) ? mig.estado.combosU.map(c => mkCombo({ ...c.f })) : base.combosU,
+      combosS: Array.isArray(d.combos?.ELS) ? mig.estado.combosS.map(c => mkCombo({ ...c.f })) : base.combosS,
       niveles: Array.isArray(d.niveles)
         ? d.niveles.map(n => mkNivel(n.nombre || "Nivel", Number(n.h) || 0, Number(n.ds) || 0)) : [],
       modo: d.modo === "envolvente" ? "envolvente" : MODO_DEF,
@@ -211,6 +230,7 @@ export function ProyectoProvider({ children }) {
     // El modo conjunto y su resultado: `hips` sale sustituido por la lista EFECTIVA para
     // que ninguna pantalla tenga que acordarse de agregarle las hipótesis del conjunto.
     hips: hipsEfectivas, suma, incluidos, cargasBase,
+    migracion, cerrarMigracion: () => setMigracion(null),
     setConjunto: (v) => set({ conjunto: v }),
     setIncluido: (id, v) => set(s => ({
       nudos: s.nudos.map(n => n.id === id ? { ...n, incluido: v } : n),

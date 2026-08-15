@@ -14,6 +14,7 @@ import { c, t, SP, R, TAM } from '../tokens.js';
 import { Card, Boton, Badge, Ayuda, Divisor, Stat, Acordeon, useToast } from '../ui.jsx';
 import { DataTable } from '../DataTable.jsx';
 import { SelectorNudo } from '../SelectorNudo.jsx';
+import { AvisoMigracion } from '../AvisoMigracion.jsx';
 import { useProyecto } from '../../context/ProyectoContext.jsx';
 import { COMPONENTES, COMP_KEYS } from '../../constants/componentes.js';
 import { MODOS, rotuloNivel } from '../../engine/traslado.js';
@@ -160,6 +161,7 @@ export function ResultadosTab() {
   const vacias = [...new Set(porNivel.flatMap(r => r.vacias))];
 
   return (<>
+    <AvisoMigracion />
     <SelectorNudo />
 
     {!conCargas && (
