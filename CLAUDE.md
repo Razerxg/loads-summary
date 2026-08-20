@@ -226,7 +226,9 @@ Portado de `bases-v-0.1`: el sistema de diseño entero (`tokens.js`, `styles.js`
   dimensiona, a partir de su geometría. Sumarlo en los dos lados sería contarlo dos veces.
 - **No hay traslado en planta.** Una excentricidad `e_x`/`e_y` generaría torsión y momentos
   por `N·e`; hoy no está.
-- La **memoria de cálculo en Word** no existe: la salida es CSV.
+- La salida en Word es un **volcado de las tablas con formato de memoria** (`ReporteTab` +
+  `services/exportWord.js`), no una memoria de cálculo con capítulos y fundamentación como la de
+  `soporte-elevado-v4` o `bases-v-0.1`. Alcanza para pegar en un documento; no se sostiene sola.
 - Sólo se lee `.xlsx` y `.csv`. El `.xls` viejo no.
 
 ## Estilo
