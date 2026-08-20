@@ -26,7 +26,7 @@ const UMBRAL_PLEGADO = 12;
 
 export function SelectorNudo({ conEditar = false, soloNudo = false }) {
   const { nudos, nudoAct, setNudoAct, set, addNudo, delNudo,
-    conjunto, setConjunto, setIncluido, incluidos, suma } = useProyecto();
+    conjunto, setConjunto, setIncluido, incluidos, suma, setPos } = useProyecto();
   // Tildar o destildar los cien de una. Se hace en UNA sola actualización de estado y no
   // con cien llamadas a `setIncluido`: cada una dispara un render y un recálculo completo.
   const todos = (v) => set(st => ({ nudos: st.nudos.map(n => ({ ...n, incluido: v })) }));
@@ -149,6 +149,51 @@ export function SelectorNudo({ conEditar = false, soloNudo = false }) {
               ))}
             </div>
           </details>
+          {/* POSICIÓN EN PLANTA — plegada por defecto porque el caso corriente es no usarla, y
+              en cero el resultado es idéntico al de siempre. Pero cuando hace falta, hace toda
+              la diferencia: es la única forma de que el vuelco de una estructura con bases
+              ARTICULADAS llegue a la fundación, porque ahí el momento de cada nudo es cero y
+              todo el vuelco viaja en el desbalance de las verticales. */}
+          <details open={!!suma?.conPos} style={{ marginTop: SP.sm }}>
+            <summary style={{ cursor: "pointer", listStyle: "none", display: "flex",
+              alignItems: "center", gap: SP.sm, flexWrap: "wrap" }}>
+              <span style={t.eyebrow}>Posición en planta</span>
+              <span style={{ ...t.body, color: suma?.conPos ? C.yellow : c.txt3 }}>
+                {suma?.conPos
+                  ? "cargada — la suma incluye N·x, N·y y la torsión Vy·x − Vx·y"
+                  : "sin cargar — se supone que todo actúa en el eje de la fundación"}
+              </span>
+              <Ayuda txt={"Distancia con SIGNO de cada nudo al eje de la fundación, en metros (+X y +Y). "
+                + "Con todo en cero, la suma es la de siempre. Cargala cuando las cargas verticales estén "
+                + "netamente descentradas, y sobre todo cuando la estructura tenga las BASES ARTICULADAS: "
+                + "ahí cada nudo entrega momento cero y el vuelco viaja como par de fuerzas verticales, "
+                + "así que sin posiciones el conjunto informa vuelco nulo. Se aplica por hipótesis, de modo "
+                + "que en peso propio los aportes se cancelan solos y en viento aparecen con su signo."} />
+            </summary>
+            <div style={{ marginTop: SP.sm, maxHeight: 168, overflowY: "auto" }}>
+              <table style={{ borderCollapse: "collapse", ...t.body }}>
+                <thead><tr>
+                  {["Nudo", "x (m)", "y (m)"].map(h =>
+                    <th key={h} style={{ ...t.eyebrow, textAlign: "left", padding: "2px 8px 4px 0" }}>{h}</th>)}
+                </tr></thead>
+                <tbody>
+                  {nudos.map(n => (
+                    <tr key={n.id} style={{ opacity: n.incluido === false ? 0.45 : 1 }}>
+                      <td style={{ padding: "2px 10px 2px 0", whiteSpace: "nowrap" }}>{n.nombre || "(sin nombre)"}</td>
+                      {["x", "y"].map(eje => (
+                        <td key={eje} style={{ padding: "2px 8px 2px 0" }}>
+                          <input type="number" step="0.01" value={n.pos?.[eje] ?? 0}
+                            onChange={e => setPos(n.id, eje, e.target.value)}
+                            style={{ ...s.inp, width: 78, padding: "2px 6px" }} />
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </details>
+
           {!!suma?.avisos?.length && (
             <div style={{ ...s.note, color: C.yellow, marginTop: SP.sm }}>
               {suma.avisos.map((a, k) => <div key={k}>⚠ {a}</div>)}

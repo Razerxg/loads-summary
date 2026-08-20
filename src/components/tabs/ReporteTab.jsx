@@ -269,28 +269,49 @@ export function ReporteTab() {
             acción y las combinaciones se aplican sobre el conjunto ya compuesto.
           </p>
           <p style={R.p}>
-            <b>Hipótesis de composición adoptada:</b> se considera que las resultantes de todos los
-            apoyos actúan en el <b>baricentro de la fundación</b>. En consecuencia, las acciones del
-            conjunto son la suma algebraica de las componentes homólogas:
+            <b>Hipótesis de composición adoptada:</b>{" "}
+            {suma?.conPos
+              ? <>cada apoyo se refiere previamente al <b>eje de la fundación</b> mediante su posición
+                  en planta, y las acciones del conjunto son la suma de las resultantes así trasladadas:</>
+              : <>se considera que las resultantes de todos los apoyos actúan en el{" "}
+                  <b>baricentro de la fundación</b>. En consecuencia, las acciones del conjunto son la
+                  suma algebraica de las componentes homólogas:</>}
           </p>
           <div style={R.frm}>
-            N = Σ Nᵢ     Vx = Σ Vxᵢ     Vy = Σ Vyᵢ{"\n"}
-            Myy = Σ Myyᵢ     Mxx = Σ Mxxᵢ     T = Σ Tᵢ
+            {suma?.conPos
+              ? `N = Σ Nᵢ     Vx = Σ Vxᵢ     Vy = Σ Vyᵢ\nMyy = Σ (Myyᵢ + Nᵢ·xᵢ)     Mxx = Σ (Mxxᵢ + Nᵢ·yᵢ)     T = Σ (Tᵢ + Vyᵢ·xᵢ − Vxᵢ·yᵢ)`
+              : `N = Σ Nᵢ     Vx = Σ Vxᵢ     Vy = Σ Vyᵢ\nMyy = Σ Myyᵢ     Mxx = Σ Mxxᵢ     T = Σ Tᵢ`}
           </div>
           <p style={R.note}>
-            Bajo esta hipótesis no intervienen los momentos que generaría la excentricidad de cada
-            apoyo respecto del baricentro (términos N·e), por lo que no se requiere la posición en
-            planta de los nudos. El criterio es aplicable a conjuntos de apoyos razonablemente
-            simétricos respecto del baricentro de la fundación; para distribuciones de carga
-            vertical netamente descentradas, la verificación al vuelco debe efectuarse
-            considerando dichas excentricidades.
+            {suma?.conPos
+              ? <>Las coordenadas xᵢ, yᵢ son las distancias con signo de cada apoyo al eje de la
+                  fundación. Al aplicarse por hipótesis, los términos Nᵢ·xᵢ se cancelan cuando la carga
+                  está equilibrada —caso del peso propio sobre apoyos simétricos— y aparecen con su
+                  signo cuando no lo está. Este planteo es el que corresponde cuando la estructura
+                  transmite el vuelco como par de fuerzas verticales y no como momento en cada apoyo,
+                  situación propia de las estructuras con <b>bases articuladas</b>: allí Myyᵢ = 0 en
+                  todos los nudos y el momento de vuelco resulta exclusivamente de la distribución de
+                  las reacciones verticales.</>
+              : <>Bajo esta hipótesis no intervienen los momentos que generaría la excentricidad de cada
+                  apoyo respecto del baricentro (términos N·e), por lo que no se requiere la posición en
+                  planta de los nudos. El criterio es aplicable a conjuntos de apoyos razonablemente
+                  simétricos respecto del baricentro de la fundación; para distribuciones de carga
+                  vertical netamente descentradas —y en particular para estructuras con bases
+                  articuladas, en las que el vuelco se transmite como par de fuerzas verticales— debe
+                  declararse la posición en planta de cada apoyo.</>}
           </p>
           <Tabla n={gT()} titulo="Apoyos del modelo que gravitan sobre la fundación">
-            <Th cols={["Nudo", "Hipótesis aportadas"]} />
+            <Th cols={suma?.conPos
+              ? ["Nudo", "x (m)", "y (m)", "Hipótesis aportadas"]
+              : ["Nudo", "Hipótesis aportadas"]} />
             <tbody>
               {incluidos.map(n => (
                 <tr key={n.id}>
                   <td style={R.tdC}><b>{n.nombre || "(sin nombre)"}</b></td>
+                  {suma?.conPos && <>
+                    <td style={R.td}>{f2(n.pos?.x ?? 0)}</td>
+                    <td style={R.td}>{f2(n.pos?.y ?? 0)}</td>
+                  </>}
                   <td style={R.tdL}>{Object.keys(n.cargas || {}).join(", ") || "—"}</td>
                 </tr>
               ))}

@@ -224,12 +224,44 @@ Portado de `bases-v-0.1`: el sistema de diseño entero (`tokens.js`, `styles.js`
 - **No agrega peso al bajar de nivel.** El traslado cambia los momentos por el brazo del
   corte y nada más; el peso del pedestal, de la zapata y del suelo lo calcula la app que
   dimensiona, a partir de su geometría. Sumarlo en los dos lados sería contarlo dos veces.
-- **No hay traslado en planta.** Una excentricidad `e_x`/`e_y` generaría torsión y momentos
-  por `N·e`; hoy no está.
+- ~~No hay traslado en planta~~ → **ya está** (`engine/planta.js`): cada nudo puede llevar su
+  posición `pos.x`, `pos.y` con signo, medida desde el eje de la fundación. Falta el caso de un
+  nudo suelto descentrado fuera del modo conjunto, que hoy no usa la posición.
 - La salida en Word es un **volcado de las tablas con formato de memoria** (`ReporteTab` +
   `services/exportWord.js`), no una memoria de cálculo con capítulos y fundamentación como la de
   `soporte-elevado-v4` o `bases-v-0.1`. Alcanza para pegar en un documento; no se sostiene sola.
 - Sólo se lee `.xlsx` y `.csv`. El `.xls` viejo no.
+
+## El traslado en planta, y por qué existe
+
+- ⚠ **UNA ESTRUCTURA CON BASES ARTICULADAS NO ENTREGA SU VUELCO COMO MOMENTO.** Es el caso que
+  obligó a agregar `engine/planta.js`. Una plataforma con columnas arriostradas por cruces de
+  San Andrés, con una carga horizontal arriba: cada nudo entrega momento CERO por definición, y
+  el vuelco viaja como **par de fuerzas verticales** —dos apoyos que se comprimen, dos que se
+  descargan—. Sumando sin posiciones, los ΔN se cancelan, todos los momentos son cero y el
+  conjunto informa **vuelco nulo**. Medido en el caso de los tests: 0 contra 300 kN·m.
+  · No era una subestimación menor de la hipótesis del baricentro: era perderlo entero.
+- **La posición es GEOMÉTRICA Y POR NUDO, no una excentricidad global.** Se probó pensar en un
+  único `e_x`, `e_y` para todo el conjunto y **no sirve**: la excentricidad de la resultante no
+  es un dato geométrico sino que depende de la hipótesis —vale `H·z/W` con viento y **cero** con
+  peso propio, y cambia de signo entre `Wx+` y `Wx−`—. Con posiciones por nudo eso sale solo:
+  los `N·x` se cancelan en gravedad y aparecen con su signo en viento. Hay test de las dos cosas.
+- **La fórmula, igual que `bases-v-0.1`** (`engine/loads.js`): `Myy += N·x`, `Mxx += N·y`. Las
+  apps se pasan números; una diferencia de criterio acá daría dos memorias del mismo modelo.
+- **Acá SÍ aparece torsión**, al revés que en el traslado en profundidad: `T += Vy·x − Vx·y`,
+  que es `(r × F)_z`. El encabezado de `traslado.js` explica por qué bajar por el eje vertical
+  no la genera —el brazo es paralelo al eje del torsor— y anticipaba justamente este otro caso.
+- **Se aplica antes de acumular y por hipótesis**, así que es lineal y conmuta con el traslado
+  en profundidad y con la combinación: `M = M₀ + N·x + V·h` sale igual en cualquier orden.
+- **El `Ds` no lleva posición y no debe llevarla:** es el peso propio de la fundación, actúa en
+  su propio eje. Entra como hipótesis del nivel (`cargasEnNivel`), después de la suma de nudos,
+  así que queda fuera por construcción.
+- ⚠ **Riesgo de doble conteo con `bases-v-0.1`.** Esa app modela las cargas como puntos con
+  posición y hace `N·x` por su cuenta. La excentricidad se declara en UN solo lado: acá si el
+  destino recibe la resultante centrada, allá si se le pasan los puntos con sus coordenadas.
+- **Es el modelo correcto para estabilidad global** —vuelco, deslizamiento, presiones— y no para
+  diseño local: para punzonado o flexión de la losa importa dónde está cada apoyo, no la
+  resultante.
 
 ## Estilo
 

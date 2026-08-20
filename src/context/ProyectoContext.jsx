@@ -21,8 +21,12 @@ const CLAVE = "reacciones.v1";
 export const ARCHIVO_TIPO = "reacciones.proyecto";
 
 let seqNudo = 0;
-export const mkNudo = (nombre = "N1", cargas = {}) =>
-  ({ id: `nd${++seqNudo}${Math.random().toString(36).slice(2, 6)}`, nombre, cargas });
+// `pos` es la posición del nudo EN PLANTA respecto del eje de la fundación, con signo y en
+// metros. Sólo interviene en modo conjunto (ver engine/planta.js); en cero es exactamente el
+// comportamiento anterior, que es lo que hace que los proyectos guardados no cambien.
+export const mkNudo = (nombre = "N1", cargas = {}, pos = { x: 0, y: 0 }) =>
+  ({ id: `nd${++seqNudo}${Math.random().toString(36).slice(2, 6)}`, nombre, cargas,
+     pos: { x: Number(pos?.x) || 0, y: Number(pos?.y) || 0 } });
 
 // ── ESTADO INICIAL ──────────────────────────────────────────────────────────────
 //
@@ -104,6 +108,12 @@ export function ProyectoProvider({ children }) {
       if (v === undefined || !Number.isFinite(v)) delete c[comp]; else c[comp] = v;
       return { ...n, cargas: { ...n.cargas, [hip]: c } };
     }),
+  })), []);
+
+  // Posición en planta del nudo. Los campos son `<input type="number">` → llegan STRING.
+  const setPos = useCallback((idNudo, eje, valor) => setSt(s => ({
+    ...s, nudos: s.nudos.map(n => n.id !== idNudo ? n
+      : { ...n, pos: { ...{ x: 0, y: 0 }, ...n.pos, [eje]: Number(valor) || 0 } }),
   })), []);
 
   const addNudo = useCallback(() => setSt(s => {
@@ -203,7 +213,7 @@ export function ProyectoProvider({ children }) {
       proyecto: typeof d.proyecto === "string" ? d.proyecto : "",
       hips: Array.isArray(mig.estado.hips) && mig.estado.hips.length ? mig.estado.hips : base.hips,
       nudos: Array.isArray(d.nudos) && d.nudos.length
-        ? d.nudos.map(n => ({ ...mkNudo(n.nombre || "N", n.cargas || {}), incluido: n.incluido !== false }))
+        ? d.nudos.map(n => ({ ...mkNudo(n.nombre || "N", n.cargas || {}, n.pos), incluido: n.incluido !== false }))
         : base.nudos,
       nudoAct: 0,
       combosU: Array.isArray(d.combos?.ELU) ? mig.estado.combosU.map(c => mkCombo({ ...c.f })) : base.combosU,
@@ -220,7 +230,7 @@ export function ProyectoProvider({ children }) {
 
   const val = {
     ...st, tab, setTab, set, COMP_KEYS,
-    nudoAct, setCargas, setCarga, addNudo, delNudo,
+    nudoAct, setCargas, setCarga, setPos, addNudo, delNudo,
     setNudoAct: (i) => set({ nudoAct: i }),
     addHips, delHip,
     niveles, addNivel, setNivel, delNivel,

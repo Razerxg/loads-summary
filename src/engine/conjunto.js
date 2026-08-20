@@ -11,17 +11,27 @@
 //
 // ── LA HIPÓTESIS DE CÁLCULO, dicha de frente ────────────────────────────────────
 //
-// **SE SUMA COMPONENTE A COMPONENTE, SIN POSICIONES.** Eso equivale a suponer que todas las
-// resultantes actúan en el BARICENTRO DE LA FUNDACIÓN, que es el criterio adoptado para esta
-// app. Con esa hipótesis desaparecen los términos `N·e` que aportaría la excentricidad de
-// cada apoyo respecto del baricentro, y con ellos la necesidad de conocer la posición en
-// planta de cada nudo —que la tabla de reacciones de CYPE no trae—.
+// Se suma COMPONENTE A COMPONENTE. Con las posiciones en cero eso equivale a suponer que todas
+// las resultantes actúan en el BARICENTRO DE LA FUNDACIÓN, que fue el criterio original de la
+// app: desaparecen los términos `N·x` de la excentricidad de cada apoyo, y con ellos la
+// necesidad de conocer la posición en planta de cada nudo —que la tabla de CYPE no trae—.
 //
-// La consecuencia hay que tenerla presente y la memoria la declara: el momento del conjunto
-// es la suma de los momentos de los apoyos, y NO incluye el que genera la distribución de las
-// cargas verticales en planta. Para un conjunto razonablemente simétrico —que es el caso de
-// un sleeper con soportes repartidos— es el criterio corriente. Para una fundación con las
-// cargas verticales netamente descentradas, subestima el vuelco.
+// ES EL DEFAULT Y SIGUE SIENDO VÁLIDO PARA UN CONJUNTO SIMÉTRICO. Pero tiene un caso donde no
+// subestima un poco sino que pierde el vuelco ENTERO: una estructura con las bases ARTICULADAS
+// —una plataforma con columnas arriostradas por cruces de San Andrés, por ejemplo—. Ahí cada
+// nudo entrega momento cero por definición y el vuelco viaja como PAR DE FUERZAS VERTICALES:
+// dos apoyos que se comprimen y dos que se descargan. Al sumar sin posiciones, los ΔN se
+// cancelan, los momentos son todos cero y el conjunto informa vuelco nulo cuando en realidad
+// vale `H·z`.
+//
+// Por eso cada nudo puede llevar su POSICIÓN EN PLANTA (`pos.x`, `pos.y`, con signo, medida
+// desde el eje de la fundación). Si se carga, la suma incorpora `Myy += N·x`, `Mxx += N·y` y
+// `T += Vy·x − Vx·y` ANTES de acumular — ver `engine/planta.js`—. Si no se carga, el resultado
+// es idéntico al de siempre, así que ningún proyecto guardado cambia de números.
+//
+// La posición se aplica POR HIPÓTESIS, que es lo que hace que el caso salga bien solo: en peso
+// propio los cuatro apoyos traen la misma N y los `N·x` se cancelan (momento cero, correcto),
+// y en viento se desbalancean y aparece el vuelco con su signo.
 //
 // ── SE SUMA POR HIPÓTESIS, NO POR COMBINACIÓN ───────────────────────────────────
 //
@@ -30,6 +40,7 @@
 // resultado no correspondería a ninguna situación real. Además, siendo las dos operaciones
 // lineales, sumar-y-combinar da lo mismo que combinar-y-sumar, y hay un test que lo fija.
 import { COMP_KEYS } from '../constants/componentes.js';
+import { trasladarEnPlanta, posDe, tienePos } from './planta.js';
 
 const n0 = (v) => (typeof v === "number" && isFinite(v) ? v : 0);
 const cero = () => Object.fromEntries(COMP_KEYS.map(k => [k, 0]));
@@ -57,7 +68,11 @@ export function sumarNudos(nudos) {
       const c = n.cargas?.[h];
       if (!c) { sin.push(n.nombre || "(sin nombre)"); continue; }
       con.push(n.nombre || "(sin nombre)");
-      for (const k of COMP_KEYS) acum[k] += n0(c[k]);
+      // primero se refiere el nudo al eje de la fundación, después se acumula: con posiciones
+      // en cero es la identidad, así que el camino es uno solo y no hay rama que mantener
+      const { x, y } = posDe(n);
+      const cp = trasladarEnPlanta(c, x, y);
+      for (const k of COMP_KEYS) acum[k] += n0(cp[k]);
     }
     cargas[h] = acum;
     detalle[h] = { con, sin };
@@ -82,17 +97,23 @@ export function sumarNudos(nudos) {
       + `La suma va a salir baja en esa hipótesis, y el total va a parecer correcto igual.`);
   }
 
-  return { cargas, hips, avisos, detalle, nudos: lista.map(n => n.nombre || "(sin nombre)") };
+  return { cargas, hips, avisos, detalle, conPos: lista.some(tienePos),
+    nudos: lista.map(n => n.nombre || "(sin nombre)") };
 }
 
 // El aporte de cada nudo a UNA hipótesis, para la tabla de trazabilidad de la memoria. Sin
 // esto, la resultante del conjunto es un número que no se puede reconstruir: veinte filas
 // sumadas y ninguna forma de saber cuál pesó.
 export function aportesPorNudo(nudos, hip) {
-  return (nudos || []).map(n => ({
-    nombre: n.nombre || "(sin nombre)",
-    esf: n.cargas?.[hip] ? { ...cero(), ...n.cargas[hip] } : null,
-  }));
+  return (nudos || []).map(n => {
+    const { x, y } = posDe(n);
+    const base = n.cargas?.[hip] ? { ...cero(), ...n.cargas[hip] } : null;
+    return {
+      nombre: n.nombre || "(sin nombre)", pos: { x, y },
+      esf: base,                                        // como lo entregó el modelo, en el nudo
+      esfEje: base ? trasladarEnPlanta(base, x, y) : null,   // ya referido al eje de la fundación
+    };
+  });
 }
 
 // Total de una componente sobre todas las hipótesis y nudos, para los encabezados de resumen.
